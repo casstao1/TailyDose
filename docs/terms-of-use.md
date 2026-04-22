@@ -42,4 +42,4 @@ You agree not to misuse the app, interfere with its operation, or attempt to acc
 
 For support questions, use:
 
-[TailyDose Support](https://github.com/casstao1/TailyDose/blob/main/docs/support.md)
+[TailyDose Support](https://casstao1.github.io/TailyDose/support.html)

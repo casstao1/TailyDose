@@ -449,7 +449,7 @@ struct ProPaywallView: View {
 }
 
 private enum AppStoreLinks {
-    static let privacyPolicy = URL(string: "https://github.com/casstao1/TailyDose/blob/main/docs/privacy-policy.md")!
-    static let termsOfUse = URL(string: "https://github.com/casstao1/TailyDose/blob/main/docs/terms-of-use.md")!
-    static let support = URL(string: "https://github.com/casstao1/TailyDose/blob/main/docs/support.md")!
+    static let privacyPolicy = URL(string: "https://casstao1.github.io/TailyDose/privacy-policy.html")!
+    static let termsOfUse = URL(string: "https://casstao1.github.io/TailyDose/terms-of-use.html")!
+    static let support = URL(string: "https://casstao1.github.io/TailyDose/support.html")!
 }

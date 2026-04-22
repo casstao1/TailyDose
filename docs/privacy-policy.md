@@ -41,6 +41,6 @@ TailyDose is intended for pet care management. The app is not intended to diagno
 
 ## Contact
 
-For support or privacy questions, use the support page in this repository:
+For support or privacy questions, use the support page:
 
-[TailyDose Support](https://github.com/casstao1/TailyDose/blob/main/docs/support.md)
+[TailyDose Support](https://casstao1.github.io/TailyDose/support.html)
