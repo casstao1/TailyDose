@@ -1,5 +1,7 @@
 import SwiftData
 import SwiftUI
+import UIKit
+import UserNotifications
 
 extension Notification.Name {
     static let tailyDoseHideHomeContent = Notification.Name("tailyDoseHideHomeContent")
@@ -14,19 +16,41 @@ private enum SplashTiming {
     static let capToPillGap = 0.0
     static let pillEmerge = 1.0
     static let pillHoldBeforeZoom = 0.35
-    static let titleDelayAfterPill = 0.08
-    static let titleFade = 0.45
     static let zoom = 1.35
-    static let revealLeadBeforeZoomEnds = 0.14
+    static let revealLeadBeforeZoomEnds = 0.32
     static let dismissAfterZoom = 0.22
+}
+
+final class TailyDoseNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound, .badge]
+    }
+}
+
+final class TailyDoseAppDelegate: NSObject, UIApplicationDelegate {
+    private let notificationDelegate = TailyDoseNotificationDelegate()
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+        return true
+    }
 }
 
 @main
 struct TailyDoseApp: App {
+    @UIApplicationDelegateAdaptor(TailyDoseAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("tailyDoseLastInactiveAt") private var lastInactiveAt = 0.0
     @AppStorage("tailyDoseSplashActive") private var splashActive = false
 
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    private let screenshotMode = AppStoreScreenshotMode.current
     @State private var sharedModelContainer: ModelContainer?
     @State private var didAttemptContainerLoad = false
     @State private var isShowingSplash = false
@@ -38,20 +62,22 @@ struct TailyDoseApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
+                PetBackgroundView()
+                    .ignoresSafeArea()
+
                 if let sharedModelContainer {
-                    ContentView()
-                        .modelContainer(sharedModelContainer)
-                        .scaleEffect(isShowingSplash ? (isExitingSplash ? 1 : 0.985) : 1)
-                        .opacity(isShowingSplash ? (isExitingSplash ? 1 : 0.9) : 1)
-                        .animation(.spring(duration: 1.0, bounce: 0.08), value: isExitingSplash)
-                        .animation(.easeOut(duration: 0.4), value: isShowingSplash)
+                    if let screenshotMode {
+                        AppStoreScreenshotScene(mode: screenshotMode)
+                            .modelContainer(sharedModelContainer)
+                    } else {
+                        ContentView()
+                            .modelContainer(sharedModelContainer)
+                    }
                 } else if didAttemptContainerLoad {
                     LaunchFallbackView()
-                } else {
-                    PetBackgroundView()
                 }
 
-                if isShowingSplash {
+                if isShowingSplash, screenshotMode == nil {
                     IconSplashView(
                         animationToken: splashAnimationToken,
                         isExiting: isExitingSplash,
@@ -62,8 +88,11 @@ struct TailyDoseApp: App {
                 }
             }
             .task {
-                Task {
-                    await loadModelContainerIfNeeded()
+                await loadModelContainerIfNeeded()
+                if screenshotMode != nil {
+                    splashActive = false
+                    hasCompletedInitialSplash = true
+                    return
                 }
                 guard !hasCompletedInitialSplash, !isShowingSplash else { return }
                 runSplashAnimation()
@@ -71,10 +100,12 @@ struct TailyDoseApp: App {
             .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
             }
+            .environmentObject(subscriptionManager)
         }
     }
 
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
+        guard screenshotMode == nil else { return }
         switch newPhase {
         case .active:
             guard hasCompletedInitialSplash, shouldShowRefreshSplash else { return }
@@ -128,6 +159,9 @@ struct TailyDoseApp: App {
         }.value
 
         await MainActor.run {
+            if let container, screenshotMode != nil || AppStoreScreenshotMode.usesSimulatorScreenshotSeed {
+                try? SampleDataSeeder.replaceWithScreenshotData(in: container.mainContext)
+            }
             sharedModelContainer = container
             didAttemptContainerLoad = true
         }
@@ -195,9 +229,6 @@ private struct IconSplashView: View {
     let onPillSettled: @MainActor () -> Void
 
     @State private var iconScale: CGFloat = 0.96
-    @State private var iconOpacity = 1.0
-    @State private var titleOpacity = 0.0
-    @State private var titleOffset: CGFloat = 18
     @State private var capOffset: CGFloat = 0
     @State private var capRotation: Double = 0
     @State private var pillOffset: CGFloat = 2
@@ -208,15 +239,17 @@ private struct IconSplashView: View {
         ZStack {
             PetBackgroundView()
 
+            Color.white
+                .opacity(isExiting ? 1 : 0)
+                .ignoresSafeArea()
+
             Circle()
                 .fill(Color.white.opacity(0.78))
                 .frame(width: 280, height: 280)
                 .blur(radius: 10)
                 .offset(x: 110, y: -250)
 
-            VStack(spacing: 26) {
-                Spacer()
-
+            VStack {
                 AnimatedBottleIcon(
                     capOffset: isExiting ? -36 : capOffset,
                     capRotation: isExiting ? -70 : capRotation,
@@ -228,17 +261,8 @@ private struct IconSplashView: View {
                     .frame(width: 214, height: 214)
                     .shadow(color: PetTheme.accent.opacity(0.2), radius: 24, x: 0, y: 14)
                     .scaleEffect(iconScale)
-                    .opacity(iconOpacity)
-
-                Text("TailyDose")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundStyle(PetTheme.ink)
-                    .opacity(isExiting ? 0 : titleOpacity)
-                    .offset(y: isExiting ? 10 : titleOffset)
-
-                Spacer()
             }
-            .padding(.bottom, 220)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .opacity(isExiting ? 0 : 1)
         .animation(.easeInOut(duration: SplashTiming.zoom), value: isExiting)
@@ -250,9 +274,6 @@ private struct IconSplashView: View {
 
     private func playAnimation() async {
         iconScale = 0.96
-        iconOpacity = 1
-        titleOpacity = 0
-        titleOffset = 24
         capOffset = 0
         capRotation = 0
         pillOffset = 2
@@ -278,17 +299,10 @@ private struct IconSplashView: View {
             pillOffset = -102
             pillScale = 0.72
         }
-
-        try? await Task.sleep(for: .seconds(SplashTiming.titleDelayAfterPill))
-
-        withAnimation(.easeOut(duration: SplashTiming.titleFade)) {
-            titleOpacity = 1
-            titleOffset = 0
-        }
-
-        try? await Task.sleep(for: .seconds(max(SplashTiming.capOpen, SplashTiming.pillEmerge) - SplashTiming.titleDelayAfterPill))
+        
+        try? await Task.sleep(for: .seconds(max(SplashTiming.capOpen, SplashTiming.pillEmerge)))
         try? await Task.sleep(for: .seconds(SplashTiming.pillHoldBeforeZoom))
-        await onPillSettled()
+        onPillSettled()
     }
 }
 

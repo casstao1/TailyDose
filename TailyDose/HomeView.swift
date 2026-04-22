@@ -5,18 +5,32 @@ import UIKit
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Query(sort: \PetProfile.name) private var pets: [PetProfile]
 
     @ObservedObject var reminderManager: ReminderManager
     @State private var showingPetEditor = false
     @State private var editingPet: PetProfile?
+    @State private var medicationPet: PetProfile?
+    @State private var detailPet: PetProfile?
+    @State private var showingPaywall = false
+    @State private var paywallContext: PremiumGateContext = .multiPet
+    @State private var pendingPetDeletion: PetProfile?
 
     private var allMeds: [MedicationSchedule] {
         pets.flatMap(\.medications)
     }
 
-    private var todayLogs: [DoseLog] {
-        allMeds.flatMap(\.logs).filter { Calendar.current.isDateInToday($0.loggedAt) }
+    private var activeMeds: [MedicationSchedule] {
+        pets.flatMap { $0.activeMedications(on: .now) }
+    }
+
+    private var notificationCTA: (title: String, systemImage: String) {
+        if reminderManager.status == .denied {
+            return ("Open Notification Settings", "gearshape.fill")
+        }
+        return ("Enable Medication Alerts", "bell.fill")
     }
 
     var body: some View {
@@ -35,20 +49,40 @@ struct HomeView: View {
 
                             HStack(spacing: 12) {
                                 TinyMetric(value: "\(pets.count)", label: "Pets", systemImage: "pawprint.fill")
-                                TinyMetric(value: "\(allMeds.count)", label: "Active Meds", systemImage: "pills.fill")
+                                TinyMetric(value: "\(activeMeds.count)", label: "Active Meds", systemImage: "pills.fill")
                             }
                         }
                     }
 
-                    if reminderManager.status != .authorized && reminderManager.status != .provisional && reminderManager.status != .ephemeral {
+                    if subscriptionManager.hasActiveSubscription,
+                       reminderManager.status != .authorized && reminderManager.status != .provisional && reminderManager.status != .ephemeral {
                         PlushCard {
                             Button {
-                                Task { await reminderManager.requestAuthorization() }
+                                handleNotificationAccessTapped()
                             } label: {
-                                Label("Enable Medication Alerts", systemImage: "bell.fill")
+                                Label(notificationCTA.title, systemImage: notificationCTA.systemImage)
                                     .font(.headline)
                                     .foregroundStyle(PetTheme.accent)
                                     .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    } else if !subscriptionManager.hasActiveSubscription {
+                        PlushCard(tint: PetTheme.petMint) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Label("Reminder alerts are part of TailyDose Pro", systemImage: "bell.badge.fill")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(PetTheme.accentDeep)
+
+                                Text("Upgrade to unlock push alerts, multiple pets, and clean vet export.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(PetTheme.ink.opacity(0.82))
+
+                                Button {
+                                    openPaywall(.reminders)
+                                } label: {
+                                    Label("Unlock Pro", systemImage: "bell.badge.fill")
+                                }
+                                .buttonStyle(PrimaryPillButtonStyle())
                             }
                         }
                     }
@@ -58,57 +92,59 @@ struct HomeView: View {
                     if pets.isEmpty {
                         PlushCard {
                             Button {
-                                showingPetEditor = true
+                                handleAddPetTapped()
                             } label: {
                                 Label("Add Your First Pet", systemImage: "plus.circle.fill")
-                                    .font(.headline)
-                                    .foregroundStyle(PetTheme.accent)
                             }
+                            .buttonStyle(PrimaryPillButtonStyle())
                         }
                     } else {
                         ForEach(pets) { pet in
-                            NavigationLink {
-                                PetDetailView(pet: pet)
-                            } label: {
-                                PlushCard(tint: pet.moodStyle.tint) {
-                                    HStack(alignment: .top, spacing: 14) {
-                                        PetAvatarChip(pet: pet)
+                            PlushCard(tint: pet.moodStyle.tint) {
+                                HStack(alignment: .top, spacing: 14) {
+                                    PetAvatarChip(pet: pet)
 
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            HStack {
-                                                Text(pet.name)
-                                                    .font(.headline)
-                                                    .foregroundStyle(PetTheme.ink)
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text(pet.name)
+                                                .font(.headline)
+                                                .foregroundStyle(PetTheme.ink)
 
-                                                Spacer()
+                                            Spacer()
 
-                                                Menu {
-                                                    Button("Edit Pet", systemImage: "pencil") {
-                                                        editingPet = pet
-                                                    }
-                                                    Button("Delete Pet", systemImage: "trash", role: .destructive) {
-                                                        modelContext.delete(pet)
-                                                        try? modelContext.save()
-                                                    }
-                                                } label: {
-                                                    Image(systemName: "ellipsis.circle.fill")
-                                                        .font(.title3)
-                                                        .foregroundStyle(pet.moodStyle.tint)
+                                            Menu {
+                                                Button("Add Medication", systemImage: "pills.fill") {
+                                                    medicationPet = pet
                                                 }
+                                                Button("Edit Pet", systemImage: "pencil") {
+                                                    editingPet = pet
+                                                }
+                                                Button("Delete Pet", systemImage: "trash", role: .destructive) {
+                                                    pendingPetDeletion = pet
+                                                }
+                                            } label: {
+                                                Image(systemName: "ellipsis.circle.fill")
+                                                    .font(.title3)
+                                                    .foregroundStyle(pet.moodStyle.tint)
                                             }
-
-                                            Text([pet.kind.title, pet.breed].filter { !$0.isEmpty }.joined(separator: " • "))
-                                                .font(.subheadline)
-                                                .foregroundStyle(PetTheme.muted)
-
-                                            Text("\(pet.medications.flatMap(\.logs).filter { Calendar.current.isDateInToday($0.loggedAt) }.count) logs today")
-                                                .font(.footnote)
-                                                .foregroundStyle(PetTheme.muted)
+                                            .accessibilityLabel("Actions for \(pet.name)")
+                                            .accessibilityHint("Add medication, edit, or delete this pet")
                                         }
+
+                                        Text([pet.kind.title, pet.breed].filter { !$0.isEmpty }.joined(separator: " • "))
+                                            .font(.subheadline)
+                                            .foregroundStyle(PetTheme.muted)
+
+                                        Text("\(pet.medications.flatMap(\.logs).filter { Calendar.current.isDateInToday($0.loggedAt) && $0.status == .taken }.count) doses given today")
+                                            .font(.footnote)
+                                            .foregroundStyle(PetTheme.muted)
                                     }
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                            .onTapGesture {
+                                detailPet = pet
+                            }
                         }
                     }
                 }
@@ -119,7 +155,7 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showingPetEditor = true
+                    handleAddPetTapped()
                 } label: {
                     Label("Add Pet", systemImage: "plus.circle.fill")
                 }
@@ -131,6 +167,63 @@ struct HomeView: View {
         .sheet(item: $editingPet) { pet in
             PetEditorView(pet: pet)
         }
+        .sheet(item: $detailPet) { pet in
+            NavigationStack {
+                PetDetailView(pet: pet)
+            }
+        }
+        .sheet(item: $medicationPet) { pet in
+            MedicationEditorView(pet: pet)
+        }
+        .sheet(isPresented: $showingPaywall) {
+            ProPaywallView(context: paywallContext)
+        }
+        .confirmationDialog(
+            pendingPetDeletion.map { "Delete \($0.name)?" } ?? "Delete pet?",
+            isPresented: Binding(
+                get: { pendingPetDeletion != nil },
+                set: { if !$0 { pendingPetDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingPetDeletion
+        ) { pet in
+            Button("Delete \(pet.name) and all records", role: .destructive) {
+                modelContext.delete(pet)
+                try? modelContext.save()
+                pendingPetDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingPetDeletion = nil
+            }
+        } message: { pet in
+            Text("This removes \(pet.name)'s medications, logs, and vet records permanently.")
+        }
+    }
+
+    private func handleAddPetTapped() {
+        guard subscriptionManager.hasActiveSubscription || pets.isEmpty else {
+            openPaywall(.multiPet)
+            return
+        }
+
+        showingPetEditor = true
+    }
+
+    private func openPaywall(_ context: PremiumGateContext) {
+        paywallContext = context
+        showingPaywall = true
+    }
+
+    private func handleNotificationAccessTapped() {
+        if reminderManager.status == .denied {
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            openURL(url)
+            return
+        }
+
+        Task {
+            await reminderManager.requestAuthorization()
+        }
     }
 }
 
@@ -141,6 +234,8 @@ struct PetDetailView: View {
     @State private var showingPetEditor = false
     @State private var showingRecordEditor = false
     @State private var editingRecord: VetRecord?
+    @State private var pendingMedicationDeletion: MedicationSchedule?
+    @State private var pendingRecordDeletion: VetRecord?
 
     let pet: PetProfile
 
@@ -148,12 +243,14 @@ struct PetDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 PlushCard(tint: pet.moodStyle.tint) {
-                    HStack(alignment: .top, spacing: 14) {
+                    HStack(alignment: .center, spacing: 16) {
                         PetAvatarChip(pet: pet)
+                            .scaleEffect(1.2)
+                            .frame(width: 64, height: 64)
 
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(pet.name)
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundStyle(PetTheme.ink)
 
                             Text([pet.kind.title, pet.breed, pet.weight].filter { !$0.isEmpty }.joined(separator: " • "))
@@ -170,9 +267,12 @@ struct PetDetailView: View {
                                 Text(pet.notes)
                                     .font(.footnote)
                                     .foregroundStyle(PetTheme.muted)
+                                    .lineLimit(2)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 HStack {
@@ -193,7 +293,7 @@ struct PetDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else {
-                    ForEach(pet.activeMedications) { medication in
+                    ForEach(pet.sortedMedications) { medication in
                         PlushCard(tint: pet.moodStyle.tint) {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(alignment: .top) {
@@ -201,7 +301,10 @@ struct PetDetailView: View {
                                         Text(medication.name)
                                             .font(.headline)
                                             .foregroundStyle(PetTheme.ink)
-                                        Text("\(medication.dosage) • \(medication.directions)")
+                                        Text([medication.dosage, medication.directions]
+                                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                            .filter { !$0.isEmpty }
+                                            .joined(separator: " • "))
                                             .font(.footnote)
                                             .foregroundStyle(PetTheme.muted)
                                     }
@@ -211,14 +314,15 @@ struct PetDetailView: View {
                                             editingMedication = medication
                                         }
                                         Button("Delete", systemImage: "trash", role: .destructive) {
-                                            modelContext.delete(medication)
-                                            try? modelContext.save()
+                                            pendingMedicationDeletion = medication
                                         }
                                     } label: {
                                         Image(systemName: "ellipsis.circle.fill")
                                             .font(.title3)
                                             .foregroundStyle(pet.moodStyle.tint)
                                     }
+                                    .accessibilityLabel("Actions for \(medication.name)")
+                                    .accessibilityHint("Edit or delete this medication")
                                 }
 
                                 HStack(spacing: 10) {
@@ -238,19 +342,11 @@ struct PetDetailView: View {
                                         .font(.footnote)
                                         .foregroundStyle(PetTheme.muted)
                                 }
-
-                                HStack(spacing: 10) {
-                                    Button("Log Taken") {
-                                        logDose(for: medication, status: .taken)
-                                    }
-                                    .buttonStyle(PrimaryPillButtonStyle())
-
-                                    Button("Skip") {
-                                        logDose(for: medication, status: .skipped)
-                                    }
-                                    .buttonStyle(SecondaryPillButtonStyle())
-                                }
                             }
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                        .onTapGesture {
+                            editingMedication = medication
                         }
                     }
                 }
@@ -289,6 +385,7 @@ struct PetDetailView: View {
                                         .overlay {
                                             Image(systemName: "cross.case.fill")
                                                 .foregroundStyle(PetTheme.accentDeep)
+                                                .accessibilityHidden(true)
                                         }
                                 }
 
@@ -320,8 +417,7 @@ struct PetDetailView: View {
                                 editingRecord = record
                             }
                             Button("Delete Record", systemImage: "trash", role: .destructive) {
-                                modelContext.delete(record)
-                                try? modelContext.save()
+                                pendingRecordDeletion = record
                             }
                         }
                     }
@@ -330,7 +426,6 @@ struct PetDetailView: View {
             .padding(20)
         }
         .background(PetBackgroundView())
-        .navigationTitle(pet.name)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Edit") {
@@ -353,18 +448,46 @@ struct PetDetailView: View {
         .sheet(item: $editingRecord) { record in
             VetRecordEditorView(pet: pet, record: record)
         }
-    }
-
-    private func logDose(for medication: MedicationSchedule, status: DoseStatus) {
-        let now = Date.now
-        let log = DoseLog(scheduledAt: now, loggedAt: now, status: status)
-        log.medication = medication
-        medication.logs.append(log)
-        if status == .taken, let remaining = medication.remainingDoses, remaining > 0 {
-            medication.remainingDoses = remaining - 1
+        .confirmationDialog(
+            pendingMedicationDeletion.map { "Delete \($0.name)?" } ?? "Delete medication?",
+            isPresented: Binding(
+                get: { pendingMedicationDeletion != nil },
+                set: { if !$0 { pendingMedicationDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingMedicationDeletion
+        ) { medication in
+            Button("Delete \(medication.name) and its history", role: .destructive) {
+                modelContext.delete(medication)
+                try? modelContext.save()
+                pendingMedicationDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingMedicationDeletion = nil
+            }
+        } message: { _ in
+            Text("This removes the schedule and all its dose logs permanently.")
         }
-        modelContext.insert(log)
-        try? modelContext.save()
+        .confirmationDialog(
+            "Delete record?",
+            isPresented: Binding(
+                get: { pendingRecordDeletion != nil },
+                set: { if !$0 { pendingRecordDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingRecordDeletion
+        ) { record in
+            Button("Delete \(record.title)", role: .destructive) {
+                modelContext.delete(record)
+                try? modelContext.save()
+                pendingRecordDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingRecordDeletion = nil
+            }
+        } message: { _ in
+            Text("This vet record will be removed permanently.")
+        }
     }
 
     private func refillLine(for medication: MedicationSchedule) -> String? {
@@ -384,34 +507,109 @@ struct PetDetailView: View {
 struct PetEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
+    @Query(sort: \PetProfile.name) private var pets: [PetProfile]
 
     let pet: PetProfile?
 
     @State private var name: String
     @State private var kind: PetKind
     @State private var breed: String
-    @State private var weight: String
+    @State private var weightAmount: String
+    @State private var weightUnit: PetWeightUnit
     @State private var vetName: String
     @State private var vetContact: String
     @State private var notes: String
     @State private var moodStyle: PetMoodStyle
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var imageData: Data?
+    @State private var showingCamera = false
+    @State private var showingPaywall = false
 
     init(pet: PetProfile? = nil) {
         self.pet = pet
+        let parsedWeight = Self.parseWeight(pet?.weight ?? "")
         _name = State(initialValue: pet?.name ?? "")
         _kind = State(initialValue: pet?.kind ?? .dog)
         _breed = State(initialValue: pet?.breed ?? "")
-        _weight = State(initialValue: pet?.weight ?? "")
+        _weightAmount = State(initialValue: parsedWeight.amount)
+        _weightUnit = State(initialValue: parsedWeight.unit)
         _vetName = State(initialValue: pet?.vetName ?? "")
         _vetContact = State(initialValue: pet?.vetContact ?? "")
         _notes = State(initialValue: pet?.notes ?? "")
         _moodStyle = State(initialValue: pet?.moodStyle ?? .blush)
+        _imageData = State(initialValue: pet?.imageData)
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                if pet == nil && !subscriptionManager.hasActiveSubscription && pets.count >= 1 {
+                    Section {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Multiple pets are part of TailyDose Pro.")
+                                .font(.headline)
+                                .foregroundStyle(PetTheme.ink)
+
+                            Button("Upgrade to Pro") {
+                                showingPaywall = true
+                            }
+                            .buttonStyle(PrimaryPillButtonStyle(compact: true))
+                        }
+                    }
+                }
+
                 Section("Pet") {
+                    VStack(spacing: 18) {
+                        Group {
+                            if let imageData, let uiImage = UIImage(data: imageData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 112, height: 112)
+                                    .clipShape(Circle())
+                                    .overlay {
+                                        Circle().stroke(Color.white.opacity(0.95), lineWidth: 2)
+                                    }
+                            } else {
+                                ZStack {
+                                    Circle()
+                                        .fill(moodStyle.tint.opacity(0.22))
+
+                                    Image(systemName: kind.symbol)
+                                        .font(.system(size: 42, weight: .semibold))
+                                        .foregroundStyle(moodStyle.tint)
+                                }
+                                .frame(width: 112, height: 112)
+                                .overlay {
+                                    Circle().stroke(Color.white.opacity(0.95), lineWidth: 2)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+
+                        HStack(spacing: 12) {
+                            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                                Button {
+                                    showingCamera = true
+                                } label: {
+                                    Label("Take Photo", systemImage: "camera.fill")
+                                }
+                                .buttonStyle(PrimaryPillButtonStyle(compact: true))
+                            }
+
+                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                Label("Choose Photo", systemImage: "photo.fill")
+                            }
+                            .buttonStyle(SecondaryPillButtonStyle(compact: true))
+                        }
+                        .padding(.top, 2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 22, trailing: 16))
+
                     TextField("Name", text: $name)
                     Picker("Type", selection: $kind) {
                         ForEach(PetKind.allCases) { kind in
@@ -419,7 +617,17 @@ struct PetEditorView: View {
                         }
                     }
                     TextField("Breed", text: $breed)
-                    TextField("Weight", text: $weight)
+                    HStack {
+                        TextField("Weight", text: $weightAmount)
+                            .keyboardType(.decimalPad)
+
+                        Picker("Unit", selection: $weightUnit) {
+                            ForEach(PetWeightUnit.allCases) { unit in
+                                Text(unit.label).tag(unit)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
                 }
 
                 Section("Vet") {
@@ -451,14 +659,34 @@ struct PetEditorView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPaywall) {
+            ProPaywallView(context: .multiPet)
+        }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraPicker { capturedImage in
+                imageData = capturedImage.jpegData(compressionQuality: 0.9)
+            }
+            .ignoresSafeArea()
+        }
+        .task(id: selectedPhoto) {
+            if let selectedPhoto {
+                imageData = try? await selectedPhoto.loadTransferable(type: Data.self)
+            }
+        }
     }
 
     private func save() {
+        guard pet != nil || subscriptionManager.hasActiveSubscription || pets.isEmpty else {
+            showingPaywall = true
+            return
+        }
+
         let target = pet ?? PetProfile(name: name)
         target.name = name
         target.kind = kind
         target.breed = breed
-        target.weight = weight
+        target.weight = Self.formatWeight(amount: weightAmount, unit: weightUnit)
+        target.imageData = imageData
         target.vetName = vetName
         target.vetContact = vetContact
         target.notes = notes
@@ -470,6 +698,35 @@ struct PetEditorView: View {
 
         try? modelContext.save()
         dismiss()
+    }
+
+    private static func parseWeight(_ raw: String) -> (amount: String, unit: PetWeightUnit) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let components = trimmed.split(separator: " ")
+        let amount = components.first.map(String.init) ?? ""
+        let unit = components.dropFirst().first.flatMap { PetWeightUnit(label: String($0)) } ?? .lb
+        return (amount, unit)
+    }
+
+    private static func formatWeight(amount: String, unit: PetWeightUnit) -> String {
+        let trimmedAmount = amount.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAmount.isEmpty else { return "" }
+        return "\(trimmedAmount) \(unit.label)"
+    }
+}
+
+enum PetWeightUnit: String, CaseIterable, Identifiable {
+    case lb
+    case kg
+    case oz
+    case g
+
+    var id: String { rawValue }
+
+    var label: String { rawValue }
+
+    init?(label: String) {
+        self.init(rawValue: label)
     }
 }
 
@@ -559,5 +816,48 @@ struct VetRecordEditorView: View {
 
         try? modelContext.save()
         dismiss()
+    }
+}
+
+private struct CameraPicker: UIViewControllerRepresentable {
+    let onImagePicked: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onImagePicked: onImagePicked, dismiss: dismiss)
+    }
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        picker.allowsEditing = true
+        picker.modalPresentationStyle = .fullScreen
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        private let onImagePicked: (UIImage) -> Void
+        private let dismiss: DismissAction
+
+        init(onImagePicked: @escaping (UIImage) -> Void, dismiss: DismissAction) {
+            self.onImagePicked = onImagePicked
+            self.dismiss = dismiss
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let edited = info[.editedImage] as? UIImage {
+                onImagePicked(edited)
+            } else if let original = info[.originalImage] as? UIImage {
+                onImagePicked(original)
+            }
+            dismiss()
+        }
     }
 }

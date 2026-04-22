@@ -19,6 +19,8 @@
 		A1000000000000000000100A /* ShareVetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000100A /* ShareVetView.swift */; };
 		A1000000000000000000100B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000100C /* Assets.xcassets */; };
 		A1000000000000000000100C /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000100D /* LaunchScreen.storyboard */; };
+		A1000000000000000000100D /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000100E /* SubscriptionManager.swift */; };
+		A1000000000000000000100E /* AppStoreScreenshotScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000100F /* AppStoreScreenshotScene.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +37,9 @@
 		B1000000000000000000100B /* TailyDose.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TailyDose.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000000000000000000100C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1000000000000000000100D /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		B1000000000000000000100E /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		B1000000000000000000100F /* AppStoreScreenshotScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreScreenshotScene.swift; sourceTree = "<group>"; };
+		DF2199E42F90597E0048131A /* TailyDose.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = TailyDose.storekit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +56,7 @@
 		D10000000000000000001001 = {
 			isa = PBXGroup;
 			children = (
+				DF2199E42F90597E0048131A /* TailyDose.storekit */,
 				D10000000000000000001002 /* TailyDose */,
 				D10000000000000000001003 /* Products */,
 			);
@@ -71,6 +77,8 @@
 				B1000000000000000000100A /* ShareVetView.swift */,
 				B1000000000000000000100C /* Assets.xcassets */,
 				B1000000000000000000100D /* LaunchScreen.storyboard */,
+				B1000000000000000000100E /* SubscriptionManager.swift */,
+				B1000000000000000000100F /* AppStoreScreenshotScene.swift */,
 			);
 			path = TailyDose;
 			sourceTree = "<group>";
@@ -163,6 +171,8 @@
 				A10000000000000000001008 /* MedicationsView.swift in Sources */,
 				A10000000000000000001009 /* CalendarHistoryView.swift in Sources */,
 				A1000000000000000000100A /* ShareVetView.swift in Sources */,
+				A1000000000000000000100D /* SubscriptionManager.swift in Sources */,
+				A1000000000000000000100E /* AppStoreScreenshotScene.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,6 +189,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TailyDose;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
+				INFOPLIST_KEY_NSCameraUsageDescription = "TailyDose uses the camera so you can take a pet profile photo and attach care documents.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "TailyDose uses your photo library so you can attach vet records and care documents to a pet profile.";
 				INFOPLIST_KEY_NSUserNotificationsUsageDescription = "TailyDose uses notifications for pet medication reminders.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -196,6 +208,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -212,6 +225,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = TailyDose;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
+				INFOPLIST_KEY_NSCameraUsageDescription = "TailyDose uses the camera so you can take a pet profile photo and attach care documents.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "TailyDose uses your photo library so you can attach vet records and care documents to a pet profile.";
 				INFOPLIST_KEY_NSUserNotificationsUsageDescription = "TailyDose uses notifications for pet medication reminders.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

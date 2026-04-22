@@ -3,11 +3,17 @@
 # Xcode user data
 xcuserdata/
 *.xcuserstate
+*.xcresult
 
 # Build products
 build/
 DerivedData/
+.codex-screenshots-derived/
+.real-screenshot-build/
 
 # Swift Package Manager
 .build/
 Package.resolved
+
+# Local scratch files
+tmp_resize_video.swift

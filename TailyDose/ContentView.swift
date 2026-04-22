@@ -3,9 +3,10 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Query(sort: \PetProfile.name) private var pets: [PetProfile]
 
-    @AppStorage("tailyDoseSampleDataVersion") private var sampleDataVersion = 0
+    @AppStorage("tailyDoseRemovedSampleData") private var removedSampleData = false
     @AppStorage("tailyDoseSplashActive") private var splashActive = true
     @StateObject private var reminderManager = ReminderManager.shared
     @State private var hasBootstrapped = false
@@ -13,6 +14,9 @@ struct ContentView: View {
     @State private var showingDatePicker = false
     @State private var timelineEntries: [DoseTimelineEntry] = []
     @State private var shouldRevealContent = false
+    @State private var detailPet: PetProfile?
+    @State private var editingMedicationTarget: HomeMedicationEditingTarget?
+    @State private var pendingTimelineSaveTask: Task<Void, Never>?
 
     private var selectedDayEntries: [DoseTimelineEntry] {
         timelineEntries
@@ -96,6 +100,8 @@ struct ContentView: View {
                                                     .stroke(.white.opacity(0.18), lineWidth: 1)
                                             }
                                     }
+                                    .accessibilityLabel("More options")
+                                    .accessibilityHint("Opens the menu for history, export, and other actions")
                                 }
 
                                 Text(headerTitle)
@@ -140,6 +146,15 @@ struct ContentView: View {
                                 TimelineRow(
                                     entry: entry,
                                     onToggleTaken: { toggleTaken(entry: entry) },
+                                    onOpenPet: {
+                                        detailPet = entry.pet
+                                    },
+                                    onOpenMedication: {
+                                        editingMedicationTarget = HomeMedicationEditingTarget(
+                                            pet: entry.pet,
+                                            medication: entry.medication
+                                        )
+                                    },
                                     isRevealed: shouldRevealContent,
                                     revealDelay: Double(index) * 0.07 + 0.1
                                 )
@@ -192,50 +207,81 @@ struct ContentView: View {
             }
             .task { await bootstrapIfNeeded() }
             .task(id: timelineSignature) { rebuildTimeline() }
-            .task(id: notificationSignature) {
+            .task(id: notificationTaskSignature) {
                 guard hasBootstrapped else { return }
                 try? await Task.sleep(for: .milliseconds(700))
+                guard subscriptionManager.hasActiveSubscription else {
+                    reminderManager.clearNotifications()
+                    return
+                }
                 await reminderManager.syncNotifications(pets: pets)
+            }
+            .sheet(item: $detailPet) { pet in
+                NavigationStack {
+                    PetDetailView(pet: pet)
+                }
+            }
+            .sheet(item: $editingMedicationTarget) { target in
+                MedicationEditorView(pet: target.pet, medication: target.medication)
             }
         }
     }
 
     private var timelineSignature: String {
-        let dayKey = Calendar.current.startOfDay(for: selectedDate).formatted(date: .numeric, time: .omitted)
-        let petKey = pets
-            .flatMap { pet in
-                pet.medications.flatMap { medication in
-                    let times = medication.reminderTimes.map { "\($0.hour):\($0.minute)" }.joined(separator: ",")
-                    let logs = medication.logs.map { "\($0.scheduledAt.ISO8601Format())|\($0.statusRawValue)" }.joined(separator: ",")
-                    return ["\(pet.id.uuidString)", "\(medication.id.uuidString)", times, logs]
+        let dayKey = Calendar.current.startOfDay(for: selectedDate).timeIntervalSince1970
+        var hasher = Hasher()
+        hasher.combine(dayKey)
+        for pet in pets {
+            hasher.combine(pet.id)
+            for medication in pet.medications {
+                hasher.combine(medication.id)
+                hasher.combine(medication.startDate)
+                hasher.combine(medication.courseEndDate)
+                for time in medication.reminderTimes {
+                    hasher.combine(time.hour)
+                    hasher.combine(time.minute)
+                }
+                for log in medication.logs {
+                    hasher.combine(log.scheduledAt)
+                    hasher.combine(log.statusRawValue)
                 }
             }
-            .joined(separator: "#")
-        return "\(dayKey)|\(petKey)"
+        }
+        return "\(hasher.finalize())"
     }
 
     private var notificationSignature: String {
-        pets
-            .flatMap { pet in
-                pet.medications.map { med in
-                    let times = med.reminderTimes.map { "\($0.hour):\($0.minute)" }.joined(separator: ",")
-                    return "\(pet.id.uuidString)|\(med.id.uuidString)|\(med.reminderEnabled)|\(times)"
+        var hasher = Hasher()
+        for pet in pets {
+            hasher.combine(pet.id)
+            for med in pet.medications {
+                hasher.combine(med.id)
+                hasher.combine(med.reminderEnabled)
+                // Include course dates so editing a med's start/end triggers
+                // a re-sync — otherwise finished courses keep firing alerts.
+                hasher.combine(med.startDate)
+                hasher.combine(med.courseEndDate)
+                for time in med.reminderTimes {
+                    hasher.combine(time.hour)
+                    hasher.combine(time.minute)
                 }
             }
-            .joined(separator: "#")
+        }
+        return "\(hasher.finalize())"
+    }
+
+    private var notificationTaskSignature: String {
+        "\(subscriptionManager.hasActiveSubscription)|\(notificationSignature)"
     }
 
     private func bootstrapIfNeeded() async {
         guard !hasBootstrapped else { return }
 
-        if sampleDataVersion == 0 {
-            try? SampleDataSeeder.seedIfNeeded(in: modelContext)
-            sampleDataVersion = 1
-        }
-
-        if sampleDataVersion < SampleDataSeeder.currentVersion {
-            try? SampleDataSeeder.ensureDemoData(in: modelContext)
-            sampleDataVersion = SampleDataSeeder.currentVersion
+        if !AppStoreScreenshotMode.isActive,
+           !AppStoreScreenshotMode.usesSimulatorScreenshotSeed,
+           !removedSampleData {
+            try? SampleDataSeeder.removeSeededDemoData(in: modelContext)
+            removedSampleData = true
         }
 
         hasBootstrapped = true
@@ -244,11 +290,20 @@ struct ContentView: View {
 
     private func rebuildTimeline() {
         let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: selectedDate)
 
         timelineEntries = pets
             .flatMap { pet in
-                pet.medications.flatMap { medication in
-                    medication.reminderTimes.map { time in
+                pet.medications.compactMap { medication -> [DoseTimelineEntry]? in
+                    // Filter medications by course start/end so inactive meds don't appear.
+                    let startDay = calendar.startOfDay(for: medication.startDate)
+                    guard startDay <= dayStart else { return nil }
+                    if let endDate = medication.courseEndDate,
+                       calendar.startOfDay(for: endDate) < dayStart {
+                        return nil
+                    }
+
+                    return medication.reminderTimes.map { time in
                         let scheduledAt = calendar.date(
                             bySettingHour: time.hour,
                             minute: time.minute,
@@ -268,19 +323,28 @@ struct ContentView: View {
                         )
                     }
                 }
+                .flatMap { $0 }
             }
             .sorted { $0.scheduledAt < $1.scheduledAt }
     }
 
     private func toggleTaken(entry: DoseTimelineEntry) {
         if let existing = entry.log {
-            entry.medication.logs.removeAll { $0.id == existing.id }
-            if let remaining = entry.medication.remainingDoses {
-                entry.medication.remainingDoses = remaining + 1
+            if existing.status == .taken {
+                entry.medication.logs.removeAll { $0.id == existing.id }
+                if let remaining = entry.medication.remainingDoses {
+                    entry.medication.remainingDoses = remaining + 1
+                }
+                modelContext.delete(existing)
+            } else {
+                existing.status = .taken
+                existing.loggedAt = .now
+                if let remaining = entry.medication.remainingDoses, remaining > 0 {
+                    entry.medication.remainingDoses = remaining - 1
+                }
             }
-            modelContext.delete(existing)
-            try? modelContext.save()
             rebuildTimeline()
+            scheduleTimelineSave()
             return
         }
 
@@ -295,8 +359,18 @@ struct ContentView: View {
             entry.medication.remainingDoses = remaining - 1
         }
         modelContext.insert(log)
-        try? modelContext.save()
         rebuildTimeline()
+        scheduleTimelineSave()
+    }
+
+    private func scheduleTimelineSave() {
+        pendingTimelineSaveTask?.cancel()
+        pendingTimelineSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(40))
+            guard !Task.isCancelled else { return }
+            try? modelContext.save()
+            pendingTimelineSaveTask = nil
+        }
     }
 }
 
@@ -311,9 +385,20 @@ private struct DoseTimelineEntry: Identifiable {
     }
 }
 
+private struct HomeMedicationEditingTarget: Identifiable {
+    let pet: PetProfile
+    let medication: MedicationSchedule
+
+    var id: PersistentIdentifier {
+        medication.persistentModelID
+    }
+}
+
 private struct TimelineRow: View {
     let entry: DoseTimelineEntry
     let onToggleTaken: () -> Void
+    let onOpenPet: () -> Void
+    let onOpenMedication: () -> Void
     let isRevealed: Bool
     let revealDelay: Double
 
@@ -345,54 +430,89 @@ private struct TimelineRow: View {
 
     var body: some View {
         PlushCard(tint: isCompleted ? Color.gray.opacity(0.18) : entry.pet.moodStyle.tint, compact: true) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: contentSpacing) {
                 HStack(alignment: .top, spacing: 12) {
-                    VStack(spacing: 6) {
+                    VStack(spacing: 5) {
                         PetAvatarChip(pet: entry.pet, compact: true)
 
                         Text(entry.pet.name)
-                            .font(.caption.weight(.semibold))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(PetTheme.muted)
                             .multilineTextAlignment(.center)
                             .frame(width: 44)
                     }
+                    .frame(minHeight: 60, alignment: .center)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onOpenPet()
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Open \(entry.pet.name)'s profile")
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: contentSpacing) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text(entry.scheduledAt.formatted(date: .omitted, time: .shortened))
-                                .font(.headline.weight(.bold))
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundStyle(isCompleted ? PetTheme.muted : PetTheme.ink)
 
-                            Spacer()
+                            Text(medicationLine)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(isCompleted ? PetTheme.muted : PetTheme.ink)
                         }
-
-                        Text("\(entry.medication.dosage) \(entry.medication.name)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(isCompleted ? PetTheme.muted : PetTheme.ink)
-
-                        if let note = detailNote, !note.isEmpty {
-                            Text(note)
-                                .font(.caption)
-                                .foregroundStyle(PetTheme.muted)
-                        }
+                        .padding(.trailing, headlineTrailingInset)
+                        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
 
                         if let completionTimestamp {
                             Text(completionTimestamp)
-                                .font(.caption)
+                                .font(.footnote)
                                 .foregroundStyle(DoseStatus.taken.tint)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if showsDetailBox {
+                            VStack(alignment: .leading, spacing: 4) {
+                                if let detail = doseDetail {
+                                    Text(detail)
+                                        .font(.footnote)
+                                        .foregroundStyle(PetTheme.muted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                Color.white.opacity(isCompleted ? 0.4 : 0.58),
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            )
                         }
 
                     }
-
-                    Spacer(minLength: 0)
-
-                    Button(action: onToggleTaken) {
-                        Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 28, weight: .semibold))
-                            .foregroundStyle(isCompleted ? DoseStatus.taken.tint : PetTheme.accentDeep.opacity(0.85))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onOpenMedication()
                     }
-                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Opens medication details")
                 }
+            }
+            .overlay(alignment: .topTrailing) {
+                Button(action: onToggleTaken) {
+                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(isCompleted ? DoseStatus.taken.tint : PetTheme.accentDeep.opacity(0.85))
+                        .frame(width: 116, height: 96, alignment: .topTrailing)
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .frame(width: 116, height: 96, alignment: .topTrailing)
+                .accessibilityLabel(isCompleted
+                    ? "Mark \(medicationLine) for \(entry.pet.name) as not given"
+                    : "Mark \(medicationLine) for \(entry.pet.name) as given")
+                .accessibilityAddTraits(isCompleted ? .isSelected : [])
             }
         }
         .opacity(isRevealed ? (isCompleted ? 0.72 : 1) : 0)
@@ -401,12 +521,52 @@ private struct TimelineRow: View {
         .animation(.spring(duration: 0.86, bounce: 0.24).delay(revealDelay), value: isRevealed)
     }
 
-    private var detailNote: String? {
-        if let log = entry.log, !log.note.isEmpty {
-            return log.note
+    // Shown beneath the med name. Prefers the log's per-dose note if present
+    // (user-entered context for this specific dose); otherwise falls back to
+    // the medication's standing directions. Returns nil when there's nothing
+    // to show so the row stays compact.
+    private var doseDetail: String? {
+        if let log = entry.log {
+            let trimmedNote = log.note.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedNote.isEmpty { return trimmedNote }
+        }
+        let trimmedDirections = entry.medication.directions.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedDirections.isEmpty ? nil : trimmedDirections
+    }
+
+    private var showsExtraArea: Bool {
+        doseDetail != nil || completionTimestamp != nil
+    }
+
+    private var showsDetailBox: Bool {
+        doseDetail != nil
+    }
+
+    private var inlineCompletionTimestamp: String? {
+        guard doseDetail == nil else { return nil }
+        return completionTimestamp
+    }
+
+    private var contentSpacing: CGFloat {
+        if showsDetailBox {
+            return completionTimestamp == nil ? 12 : 6
         }
 
-        return entry.medication.directions
+        if completionTimestamp != nil {
+            return 4
+        }
+
+        return 0
+    }
+
+    private var headlineTrailingInset: CGFloat {
+        40
+    }
+
+    private var medicationLine: String {
+        let trimmedDosage = entry.medication.dosage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = entry.medication.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [trimmedDosage, trimmedName].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     private var completionTimestamp: String? {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum PetTheme {
     static let ink = Color(red: 0.17, green: 0.20, blue: 0.28)
@@ -124,18 +125,25 @@ struct PetAvatarChip: View {
     let pet: PetProfile
     var compact = false
 
-    private var size: CGFloat { compact ? 38 : 50 }
+    private var size: CGFloat { compact ? 34 : 50 }
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(pet.moodStyle.tint.opacity(0.22))
+            if let imageData = pet.imageData, let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Circle()
+                    .fill(pet.moodStyle.tint.opacity(0.22))
 
-            Image(systemName: pet.kind.symbol)
-                .font(.system(size: compact ? 16 : 20, weight: .semibold))
-                .foregroundStyle(pet.moodStyle.tint)
+                Image(systemName: pet.kind.symbol)
+                    .font(.system(size: compact ? 14 : 20, weight: .semibold))
+                    .foregroundStyle(pet.moodStyle.tint)
+            }
         }
         .frame(width: size, height: size)
+        .clipShape(Circle())
         .overlay {
             Circle()
                 .stroke(Color.white.opacity(0.95), lineWidth: 1)
@@ -159,7 +167,7 @@ struct PillBadge: View {
 }
 
 struct PrimaryPillButtonStyle: ButtonStyle {
-    var tint: Color = PetTheme.accent
+    var tint: Color = PetTheme.accentDeep
     var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -173,6 +181,7 @@ struct PrimaryPillButtonStyle: ButtonStyle {
                 tint.opacity(configuration.isPressed ? 0.86 : 1),
                 in: RoundedRectangle(cornerRadius: compact ? 16 : 18, style: .continuous)
             )
+            .shadow(color: tint.opacity(0.18), radius: compact ? 8 : 12, x: 0, y: compact ? 5 : 7)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
@@ -190,16 +199,16 @@ struct SecondaryPillButtonStyle: ButtonStyle {
             .padding(.vertical, compact ? 10 : 12)
             .frame(maxWidth: compact ? nil : .infinity)
             .background(
-                tint.opacity(configuration.isPressed ? 0.18 : 0.12),
+                tint.opacity(configuration.isPressed ? 0.26 : 0.2),
                 in: RoundedRectangle(cornerRadius: compact ? 16 : 18, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: compact ? 16 : 18, style: .continuous)
-                    .stroke(tint.opacity(0.12), lineWidth: 1)
+                    .stroke(tint.opacity(0.28), lineWidth: 1)
             }
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
-        }
+    }
 }
 
 struct TinyMetric: View {

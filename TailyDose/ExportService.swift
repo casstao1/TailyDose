@@ -26,9 +26,15 @@ enum ExportService {
             if pet.medications.isEmpty {
                 lines.append("- None recorded")
             } else {
-                for med in pet.activeMedications {
+                for med in pet.sortedMedications {
                     let times = med.reminderTimes.map(\.label).joined(separator: ", ")
-                    lines.append("- \(med.dosage) \(med.name) | \(med.directions)")
+                    // Build the line piece-by-piece so empty dosage/directions
+                    // don't leave stray separators like "- Medname | ".
+                    let trimmedDosage = med.dosage.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedDirections = med.directions.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let headline = trimmedDosage.isEmpty ? med.name : "\(trimmedDosage) \(med.name)"
+                    let medLine = trimmedDirections.isEmpty ? headline : "\(headline) | \(trimmedDirections)"
+                    lines.append("- \(medLine)")
                     if !times.isEmpty {
                         lines.append("  Reminder times: \(times)")
                     }

@@ -12,6 +12,14 @@ struct CalendarHistoryView: View {
         logs.filter { Calendar.current.isDate($0.loggedAt, inSameDayAs: selectedDate) }
     }
 
+    private var missingReminderEntries: [(medication: MedicationSchedule, scheduled: Date)] {
+        missingReminderEntries(for: selectedDate, now: .now)
+    }
+
+    private var canAutoMarkMissed: Bool {
+        !missingReminderEntries.isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -47,13 +55,29 @@ struct CalendarHistoryView: View {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Text("No logs for \(selectedDate.formatted(date: .abbreviated, time: .omitted)).")
                                         .foregroundStyle(PetTheme.muted)
-                                    Button("Auto-mark today's reminders as missed") {
-                                        createMissedLogsForSelectedDate()
+                                    if canAutoMarkMissed {
+                                        Button("Auto-mark reminders as missed") {
+                                            createMissedLogsForSelectedDate()
+                                        }
+                                        .buttonStyle(.bordered)
                                     }
-                                    .buttonStyle(.bordered)
                                 }
                             }
                         } else {
+                            if canAutoMarkMissed {
+                                PlushCard {
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        Text("Some reminder times for this day still have no history entry.")
+                                            .foregroundStyle(PetTheme.muted)
+
+                                        Button("Auto-mark remaining reminders as missed") {
+                                            createMissedLogsForSelectedDate()
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                }
+                            }
+
                             ForEach(selectedDayLogs) { log in
                                 PlushCard(tint: log.medication?.pet?.moodStyle.tint) {
                                     HStack(alignment: .top, spacing: 14) {
@@ -98,26 +122,57 @@ struct CalendarHistoryView: View {
     }
 
     private func createMissedLogsForSelectedDate() {
-        let dayMeds = pets.flatMap(\.medications)
-        for medication in dayMeds {
-            for time in medication.reminderTimes {
-                let scheduled = Calendar.current.date(
-                    bySettingHour: time.hour,
-                    minute: time.minute,
-                    second: 0,
-                    of: selectedDate
-                ) ?? selectedDate
-
-                let alreadyLogged = medication.logs.contains { Calendar.current.isDate($0.scheduledAt, equalTo: scheduled, toGranularity: .minute) }
-                guard !alreadyLogged else { continue }
-
-                let log = DoseLog(scheduledAt: scheduled, loggedAt: scheduled, status: .missed, note: "Auto-marked from calendar view.")
-                log.medication = medication
-                medication.logs.append(log)
-                modelContext.insert(log)
-            }
+        for entry in missingReminderEntries {
+            let log = DoseLog(
+                scheduledAt: entry.scheduled,
+                loggedAt: entry.scheduled,
+                status: .missed,
+                note: "Auto-marked from calendar view."
+            )
+            log.medication = entry.medication
+            entry.medication.logs.append(log)
+            modelContext.insert(log)
         }
 
         try? modelContext.save()
+    }
+
+    private func missingReminderEntries(for day: Date, now: Date) -> [(medication: MedicationSchedule, scheduled: Date)] {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: day)
+
+        guard dayStart <= calendar.startOfDay(for: now) else { return [] }
+
+        return pets
+            .flatMap(\.medications)
+            .filter { medication in
+                guard !medication.reminderTimes.isEmpty else { return false }
+
+                let startDay = calendar.startOfDay(for: medication.startDate)
+                guard startDay <= dayStart else { return false }
+                if let endDate = medication.courseEndDate {
+                    return calendar.startOfDay(for: endDate) >= dayStart
+                }
+                return true
+            }
+            .flatMap { medication in
+                medication.reminderTimes.compactMap { time in
+                    let scheduled = calendar.date(
+                        bySettingHour: time.hour,
+                        minute: time.minute,
+                        second: 0,
+                        of: day
+                    ) ?? day
+
+                    guard scheduled <= now else { return nil }
+
+                    let alreadyLogged = medication.logs.contains {
+                        calendar.isDate($0.scheduledAt, equalTo: scheduled, toGranularity: .minute)
+                    }
+                    guard !alreadyLogged else { return nil }
+
+                    return (medication, scheduled)
+                }
+            }
     }
 }

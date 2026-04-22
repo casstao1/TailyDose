@@ -71,6 +71,7 @@ final class PetProfile {
     var kindRawValue: String
     var breed: String
     var weight: String
+    var imageData: Data?
     var vetName: String
     var vetContact: String
     var notes: String
@@ -89,6 +90,7 @@ final class PetProfile {
         kind: PetKind = .dog,
         breed: String = "",
         weight: String = "",
+        imageData: Data? = nil,
         vetName: String = "",
         vetContact: String = "",
         notes: String = "",
@@ -100,6 +102,7 @@ final class PetProfile {
         self.kindRawValue = kind.rawValue
         self.breed = breed
         self.weight = weight
+        self.imageData = imageData
         self.vetName = vetName
         self.vetContact = vetContact
         self.notes = notes
@@ -119,8 +122,22 @@ final class PetProfile {
         set { moodStyleRawValue = newValue.rawValue }
     }
 
-    var activeMedications: [MedicationSchedule] {
+    /// All medications attached to this pet, sorted alphabetically.
+    var sortedMedications: [MedicationSchedule] {
         medications.sorted { $0.name < $1.name }
+    }
+
+    /// Medications whose course is active on the given day.
+    func activeMedications(on day: Date, calendar: Calendar = .current) -> [MedicationSchedule] {
+        let dayStart = calendar.startOfDay(for: day)
+        return sortedMedications.filter { medication in
+            let startDay = calendar.startOfDay(for: medication.startDate)
+            guard startDay <= dayStart else { return false }
+            if let endDate = medication.courseEndDate {
+                return calendar.startOfDay(for: endDate) >= dayStart
+            }
+            return true
+        }
     }
 }
 
@@ -260,12 +277,6 @@ final class VetRecord {
 enum SampleDataSeeder {
     static let currentVersion = 5
 
-    static func seedIfNeeded(in context: ModelContext) throws {
-        let existingPets = try context.fetch(FetchDescriptor<PetProfile>())
-        guard existingPets.isEmpty else { return }
-        try insertSampleData(into: context)
-    }
-
     static func ensureDemoData(in context: ModelContext) throws {
         let pets = try context.fetch(FetchDescriptor<PetProfile>())
         let samplePets = buildSamplePets()
@@ -279,22 +290,53 @@ enum SampleDataSeeder {
         let missingPets = samplePets.filter { !existingNames.contains($0.name) }
         let missingMedications = missingPets.flatMap(\.medications)
         let missingLogs = missingMedications.flatMap(\.logs)
+        let missingRecords = missingPets.flatMap(\.vetRecords)
         let mutablePets = pets + missingPets
 
         missingPets.forEach(context.insert)
         missingMedications.forEach(context.insert)
         missingLogs.forEach(context.insert)
+        missingRecords.forEach(context.insert)
         try mergeMissingSampleDetails(into: mutablePets, from: samplePets, context: context)
         try context.save()
     }
 
+    static func removeSeededDemoData(in context: ModelContext) throws {
+        let sampleSignatures = Set(buildSamplePets().map(signature(for:)))
+        let pets = try context.fetch(FetchDescriptor<PetProfile>())
+        let seededPets = pets.filter { sampleSignatures.contains(signature(for: $0)) }
+
+        guard !seededPets.isEmpty else { return }
+
+        seededPets.forEach(context.delete)
+        try context.save()
+    }
+
+    static func replaceWithScreenshotData(in context: ModelContext) throws {
+        let existingPets = try context.fetch(FetchDescriptor<PetProfile>())
+        existingPets.forEach(context.delete)
+        try context.save()
+
+        let screenshotPets = buildScreenshotPets()
+        let screenshotMedications = screenshotPets.flatMap(\.medications)
+        let screenshotLogs = screenshotMedications.flatMap(\.logs)
+        let screenshotRecords = screenshotPets.flatMap(\.vetRecords)
+
+        screenshotPets.forEach(context.insert)
+        screenshotMedications.forEach(context.insert)
+        screenshotLogs.forEach(context.insert)
+        screenshotRecords.forEach(context.insert)
+        try context.save()
+    }
+
     private static func mergeMissingSampleDetails(into pets: [PetProfile], from samplePets: [PetProfile], context: ModelContext) throws {
-        let sampleByName = Dictionary(uniqueKeysWithValues: samplePets.map { ($0.name, $0) })
+        // Use `uniquingKeysWith` so duplicate names never trap at runtime.
+        let sampleByName = Dictionary(samplePets.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
 
         for pet in pets {
             guard let samplePet = sampleByName[pet.name] else { continue }
 
-            let sampleMedicationByName = Dictionary(uniqueKeysWithValues: samplePet.medications.map { ($0.name, $0) })
+            let sampleMedicationByName = Dictionary(samplePet.medications.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
             for medication in pet.medications {
                 guard let sampleMedication = sampleMedicationByName[medication.name] else { continue }
                 if medication.courseEndDate == nil {
@@ -328,11 +370,26 @@ enum SampleDataSeeder {
         let samplePets = buildSamplePets()
         let sampleMedications = samplePets.flatMap(\.medications)
         let sampleLogs = sampleMedications.flatMap(\.logs)
+        let sampleRecords = samplePets.flatMap(\.vetRecords)
 
         samplePets.forEach(context.insert)
         sampleMedications.forEach(context.insert)
         sampleLogs.forEach(context.insert)
+        sampleRecords.forEach(context.insert)
         try context.save()
+    }
+
+    private static func signature(for pet: PetProfile) -> String {
+        [
+            pet.name,
+            pet.kindRawValue,
+            pet.breed,
+            pet.weight,
+            pet.vetName,
+            pet.vetContact,
+            pet.notes,
+            pet.moodStyleRawValue
+        ].joined(separator: "|")
     }
 
     private static func buildSamplePets() -> [PetProfile] {
@@ -667,6 +724,216 @@ enum SampleDataSeeder {
         kiwi.vetRecords.append(kiwiRecord)
 
         return [mochi, biscuit, luna, kiwi]
+    }
+
+    private static func buildScreenshotPets() -> [PetProfile] {
+        let screenshotCalendar = Calendar.current
+        let screenshotReminderDate = screenshotCalendar.date(byAdding: .minute, value: 2, to: .now) ?? .now
+        let screenshotReminderComponents = screenshotCalendar.dateComponents([.hour, .minute], from: screenshotReminderDate)
+        let notificationReminderTime = ReminderTime(
+            hour: screenshotReminderComponents.hour ?? 20,
+            minute: screenshotReminderComponents.minute ?? 15
+        )
+
+        let olive = PetProfile(
+            name: "Olive",
+            kind: .dog,
+            breed: "Goldendoodle",
+            weight: "42 lb",
+            vetName: "Harbor Animal Care",
+            vetContact: "(555) 909-1134",
+            notes: "Loves peanut butter pill wraps and settles after an evening walk.",
+            moodStyle: .sky
+        )
+
+        let mochi = PetProfile(
+            name: "Mochi",
+            kind: .cat,
+            breed: "Ragdoll",
+            weight: "11 lb",
+            vetName: "Sunset Pet Clinic",
+            vetContact: "(555) 202-8181",
+            notes: "Best with soft treats and a calm lap before bed.",
+            moodStyle: .mint
+        )
+
+        let juniper = PetProfile(
+            name: "Juniper",
+            kind: .rabbit,
+            breed: "Holland Lop",
+            weight: "4.8 lb",
+            vetName: "Willow Exotics",
+            vetContact: "(555) 443-2288",
+            notes: "Takes syringes easiest with banana mash and a towel wrap.",
+            moodStyle: .blush
+        )
+
+        let olivePain = MedicationSchedule(
+            name: "Carprofen",
+            dosage: "1 tablet",
+            directions: "Give with breakfast and again after dinner.",
+            startDate: Calendar.current.date(byAdding: .day, value: -9, to: .now) ?? .now,
+            courseEndDate: Calendar.current.date(byAdding: .day, value: 14, to: .now),
+            remainingDoses: 22,
+            reminderEnabled: true,
+            reminderTimes: [
+                ReminderTime(hour: 7, minute: 30),
+                ReminderTime(hour: 18, minute: 30)
+            ]
+        )
+        olivePain.pet = olive
+
+        let oliveDental = MedicationSchedule(
+            name: "Dental Gel",
+            dosage: "1 pea-size dab",
+            directions: "Apply along the gumline after the morning meal.",
+            startDate: Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now,
+            courseEndDate: Calendar.current.date(byAdding: .day, value: 11, to: .now),
+            remainingDoses: 12,
+            reminderEnabled: true,
+            reminderTimes: [ReminderTime(hour: 7, minute: 45)]
+        )
+        oliveDental.pet = olive
+
+        let mochiProbiotic = MedicationSchedule(
+            name: "Probiotic Powder",
+            dosage: "1 scoop",
+            directions: "Mix into breakfast food.",
+            startDate: Calendar.current.date(byAdding: .day, value: -12, to: .now) ?? .now,
+            courseEndDate: Calendar.current.date(byAdding: .day, value: 18, to: .now),
+            remainingDoses: 20,
+            reminderEnabled: true,
+            reminderTimes: [ReminderTime(hour: 8, minute: 0)]
+        )
+        mochiProbiotic.pet = mochi
+
+        let mochiCalming = MedicationSchedule(
+            name: "Calming Drops",
+            dosage: "3 drops",
+            directions: "Use before the evening wind-down.",
+            startDate: Calendar.current.date(byAdding: .day, value: -5, to: .now) ?? .now,
+            courseEndDate: Calendar.current.date(byAdding: .day, value: 9, to: .now),
+            remainingDoses: 9,
+            reminderEnabled: true,
+            reminderTimes: [notificationReminderTime]
+        )
+        mochiCalming.pet = mochi
+
+        let juniperGut = MedicationSchedule(
+            name: "Gut Support Syringe",
+            dosage: "0.5 mL",
+            directions: "Give gently before bedtime.",
+            startDate: Calendar.current.date(byAdding: .day, value: -6, to: .now) ?? .now,
+            courseEndDate: Calendar.current.date(byAdding: .day, value: 10, to: .now),
+            remainingDoses: 11,
+            reminderEnabled: true,
+            reminderTimes: [ReminderTime(hour: 21, minute: 0)]
+        )
+        juniperGut.pet = juniper
+
+        let juniperPain = MedicationSchedule(
+            name: "Pain Relief Drops",
+            dosage: "0.25 mL",
+            directions: "Give after breakfast and before bed.",
+            startDate: Calendar.current.date(byAdding: .day, value: -3, to: .now) ?? .now,
+            courseEndDate: Calendar.current.date(byAdding: .day, value: 5, to: .now),
+            remainingDoses: 10,
+            reminderEnabled: true,
+            reminderTimes: [
+                ReminderTime(hour: 9, minute: 0),
+                ReminderTime(hour: 21, minute: 15)
+            ]
+        )
+        juniperPain.pet = juniper
+
+        let oliveMorning = calendarDate(daysOffset: 0, hour: 7, minute: 30)
+        let oliveDentalMorning = calendarDate(daysOffset: 0, hour: 7, minute: 45)
+        let mochiMorning = calendarDate(daysOffset: 0, hour: 8, minute: 0)
+        let juniperMorning = calendarDate(daysOffset: 0, hour: 9, minute: 0)
+        let juniperBedtime = calendarDate(daysOffset: -1, hour: 21, minute: 15)
+
+        let log1 = DoseLog(
+            scheduledAt: oliveMorning,
+            loggedAt: calendarDate(daysOffset: 0, hour: 7, minute: 37),
+            status: .taken,
+            note: "Took it inside peanut butter."
+        )
+        log1.medication = olivePain
+
+        let log2 = DoseLog(
+            scheduledAt: oliveDentalMorning,
+            loggedAt: calendarDate(daysOffset: 0, hour: 7, minute: 52),
+            status: .taken,
+            note: "Handled well after breakfast."
+        )
+        log2.medication = oliveDental
+
+        let log3 = DoseLog(
+            scheduledAt: mochiMorning,
+            loggedAt: calendarDate(daysOffset: 0, hour: 8, minute: 11),
+            status: .taken,
+            note: "Ate it with salmon puree."
+        )
+        log3.medication = mochiProbiotic
+
+        let log4 = DoseLog(
+            scheduledAt: juniperMorning,
+            loggedAt: calendarDate(daysOffset: 0, hour: 9, minute: 6),
+            status: .taken,
+            note: "Much easier with banana mash."
+        )
+        log4.medication = juniperPain
+
+        let log5 = DoseLog(
+            scheduledAt: juniperBedtime,
+            loggedAt: juniperBedtime,
+            status: .missed,
+            note: "Missed the bedtime window."
+        )
+        log5.medication = juniperPain
+
+        olivePain.logs.append(log1)
+        oliveDental.logs.append(log2)
+        mochiProbiotic.logs.append(log3)
+        juniperPain.logs.append(log4)
+        juniperPain.logs.append(log5)
+
+        olive.medications.append(olivePain)
+        olive.medications.append(oliveDental)
+        mochi.medications.append(mochiProbiotic)
+        mochi.medications.append(mochiCalming)
+        juniper.medications.append(juniperGut)
+        juniper.medications.append(juniperPain)
+
+        let oliveRecord = VetRecord(
+            title: "Mobility Recheck",
+            category: "Visit Summary",
+            summary: "Continue Carprofen twice daily for two more weeks and keep evening walks short.",
+            recordDate: Calendar.current.date(byAdding: .day, value: -7, to: .now) ?? .now
+        )
+        oliveRecord.pet = olive
+
+        let mochiRecord = VetRecord(
+            title: "GI Follow-Up",
+            category: "Care Instructions",
+            summary: "Finish probiotic course and keep note of any appetite changes before the next visit.",
+            recordDate: Calendar.current.date(byAdding: .day, value: -10, to: .now) ?? .now
+        )
+        mochiRecord.pet = mochi
+
+        let juniperRecord = VetRecord(
+            title: "Recovery Notes",
+            category: "Prescription",
+            summary: "Bedtime gut support and pain drops for five more days. Monitor appetite and litter habits.",
+            recordDate: Calendar.current.date(byAdding: .day, value: -4, to: .now) ?? .now
+        )
+        juniperRecord.pet = juniper
+
+        olive.vetRecords.append(oliveRecord)
+        mochi.vetRecords.append(mochiRecord)
+        juniper.vetRecords.append(juniperRecord)
+
+        return [olive, mochi, juniper]
     }
 
     private static func calendarDate(daysOffset: Int, hour: Int, minute: Int) -> Date {
