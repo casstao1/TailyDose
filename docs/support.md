@@ -6,7 +6,7 @@ TailyDose helps you track pet medications, reminder schedules, dose history, and
 
 ## Support
 
-If you need help with the app, subscription restore, reminder issues, or export behavior, open an issue in this repository:
+If you need help with the app, purchase restore, reminder issues, or export behavior, open an issue in this repository:
 
 [GitHub Issues](https://github.com/casstao1/TailyDose/issues)
 

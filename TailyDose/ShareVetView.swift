@@ -36,7 +36,7 @@ struct ShareVetView: View {
                             PlushCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     SectionHeading(eyebrow: "Vet Export", title: "Share a clean medication summary")
-                                    Text("Send your vet a readable snapshot of pets, meds, dosage timing, and recent logs.")
+                                    Text("Send your vet a readable snapshot of pets, medications, dosage timing, and recent logs.")
                                         .font(.subheadline)
                                         .foregroundStyle(PetTheme.muted)
 

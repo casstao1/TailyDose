@@ -1,6 +1,6 @@
 # TailyDose
 
-Pet medication tracking for multiple pets, with reminder scheduling, dose history, vet-ready sharing, and a Pro subscription for push alerts and export.
+Pet medication tracking for multiple pets, with reminder scheduling, dose history, vet-ready sharing, and a Pro lifetime unlock for push alerts and export.
 
 ## App Store Links
 

@@ -14,8 +14,7 @@
 - Add Privacy Policy URL
 - Add Support URL
 - Complete App Privacy questionnaire
-- Verify subscription products are approved and selectable for review
-- Verify the annual trial matches App Store Connect configuration
+- Verify the non-consumable Pro product is approved and selectable for review
 - Add screenshots and marketing copy
 - Add review notes describing how Pro features are tested
 

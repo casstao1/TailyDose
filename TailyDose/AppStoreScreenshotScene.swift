@@ -6,6 +6,7 @@ enum AppStoreScreenshotMode: String, CaseIterable {
     case manage
     case share
     case notification
+    case paywall
 
     static let environmentKey = "TAILYDOSE_SCREENSHOT_MODE"
     static let launchArgumentPrefix = "TAILYDOSE_SCREENSHOT_MODE="
@@ -44,6 +45,7 @@ enum AppStoreScreenshotMode: String, CaseIterable {
         case .manage: "STAY ORGANIZED"
         case .share: "SHARE WITH CONFIDENCE"
         case .notification: "NEVER MISS A DOSE"
+        case .paywall: "UNLOCK PRO"
         }
     }
 
@@ -53,6 +55,7 @@ enum AppStoreScreenshotMode: String, CaseIterable {
         case .manage: "Keep three pets, refills, and schedules perfectly in sync"
         case .share: "Send a clean medication summary before every vet visit"
         case .notification: "Local reminder alerts help you stay ahead of the next dose"
+        case .paywall: "Upgrade once for alerts, multiple pets, and vet-ready export"
         }
     }
 
@@ -62,6 +65,7 @@ enum AppStoreScreenshotMode: String, CaseIterable {
         case .manage: Color(red: 0.76, green: 0.84, blue: 0.47)
         case .share: Color(red: 0.49, green: 0.84, blue: 0.92)
         case .notification: Color(red: 0.98, green: 0.65, blue: 0.77)
+        case .paywall: Color(red: 0.54, green: 0.69, blue: 0.96)
         }
     }
 }
@@ -74,6 +78,15 @@ struct AppStoreScreenshotScene: View {
     let mode: AppStoreScreenshotMode
 
     var body: some View {
+        if mode == .paywall {
+            ScreenshotPaywallHost()
+                .environmentObject(subscriptionManager)
+        } else {
+            marketingScene
+        }
+    }
+
+    private var marketingScene: some View {
         ZStack {
             LinearGradient(
                 colors: [
@@ -166,6 +179,8 @@ struct AppStoreScreenshotScene: View {
                     .padding(.horizontal, 18)
                 }
             }
+        case .paywall:
+            EmptyView()
         }
     }
 }
@@ -243,5 +258,19 @@ private struct ScreenshotNotificationBanner: View {
                 .stroke(Color.white.opacity(0.18), lineWidth: 1)
         }
         .shadow(color: Color(red: 0.63, green: 0.32, blue: 0.58).opacity(0.45), radius: 20, y: 12)
+    }
+}
+
+private struct ScreenshotPaywallHost: View {
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
+
+    var body: some View {
+        ContentView()
+            .environmentObject(subscriptionManager)
+            .sheet(isPresented: .constant(true)) {
+                ProPaywallView(context: .multiPet)
+                    .environmentObject(subscriptionManager)
+                    .interactiveDismissDisabled()
+            }
     }
 }

@@ -4,7 +4,21 @@
 
   ],
   "products" : [
-
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "TAILYDOSE_LIFETIME",
+      "localizations" : [
+        {
+          "description" : "A one-time unlock for push alerts, multiple pets, and vet-ready export.",
+          "displayName" : "TailyDose Pro Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.castao.tailydose.pro.lifetime",
+      "referenceName" : "TailyDose Pro Lifetime",
+      "type" : "Non-Consumable"
+    }
   ],
   "settings" : {
     "_failTransactionsEnabled" : false,
@@ -12,58 +26,7 @@
     "_storefront" : "USA"
   },
   "subscriptionGroups" : [
-    {
-      "id" : "TAILYDOSE_PRO",
-      "localizations" : [
-        {
-          "description" : "Unlock push medication alerts, multiple pets, and vet-ready export.",
-          "displayName" : "TailyDose Pro",
-          "locale" : "en_US"
-        }
-      ],
-      "name" : "TailyDose Pro",
-      "subscriptions" : [
-        {
-          "displayPrice" : "3.99",
-          "familyShareable" : false,
-          "internalID" : "TAILYDOSE_MONTHLY",
-          "localizations" : [
-            {
-              "description" : "Monthly access to TailyDose Pro.",
-              "displayName" : "TailyDose Pro Monthly",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "com.castao.tailydose.pro.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "TailyDose Pro Monthly",
-          "subscriptionGroupID" : "TAILYDOSE_PRO",
-          "type" : "Auto-Renewable Subscription"
-        },
-        {
-          "displayPrice" : "29.99",
-          "familyShareable" : false,
-          "internalID" : "TAILYDOSE_YEARLY",
-          "introductoryOffer" : {
-            "displayPrice" : "0",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P1W"
-          },
-          "localizations" : [
-            {
-              "description" : "Yearly access to TailyDose Pro with a 7-day free trial.",
-              "displayName" : "TailyDose Pro Yearly",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "com.castao.tailydose.pro.yearly",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "TailyDose Pro Yearly",
-          "subscriptionGroupID" : "TAILYDOSE_PRO",
-          "type" : "Auto-Renewable Subscription"
-        }
-      ]
-    }
+
   ],
   "version" : {
     "major" : 2,

@@ -10,6 +10,7 @@ build/
 DerivedData/
 .codex-screenshots-derived/
 .real-screenshot-build/
+.video-build/
 
 # Swift Package Manager
 .build/
@@ -17,3 +18,12 @@ Package.resolved
 
 # Local scratch files
 tmp_resize_video.swift
+mockups/.DS_Store
+mockups/current-home-check*.png
+mockups/final-video-samples/
+mockups/launch-samples/
+mockups/launch12-samples/
+mockups/launch9-samples/
+mockups/video-frames/
+mockups/video-samples/
+mockups/tailydose-launch-home*.mov

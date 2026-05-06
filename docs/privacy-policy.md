@@ -14,12 +14,12 @@ TailyDose stores pet profiles, medication schedules, dose history, and vet recor
 
 - To display your pets, medications, schedules, and dose history inside the app.
 - To schedule medication reminder notifications when you enable alerts.
-- To determine whether Pro subscription features are unlocked.
+- To determine whether Pro purchase features are unlocked.
 - To generate export text you choose to share with your veterinarian.
 
-## Payments and Subscriptions
+## Payments and Purchases
 
-TailyDose does not process payment cards directly. Subscription purchases, renewals, and restores are handled by Apple through the App Store.
+TailyDose does not process payment cards directly. One-time Pro purchases and restores are handled by Apple through the App Store.
 
 ## Data Sharing
 

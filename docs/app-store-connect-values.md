@@ -51,8 +51,7 @@ The app stores pet and medication data locally on device.
 
 In-app purchases:
 
-- `com.castao.tailydose.pro.monthly`
-- `com.castao.tailydose.pro.yearly`
+- `com.castao.tailydose.pro.lifetime`
 
 Pro unlocks:
 
@@ -60,7 +59,7 @@ Pro unlocks:
 - multiple pets
 - vet-ready export and sharing
 
-The annual subscription includes a 7-day free trial when configured in App Store Connect.
+This is a one-time non-consumable purchase.
 
 ## Draft App Privacy Answers
 

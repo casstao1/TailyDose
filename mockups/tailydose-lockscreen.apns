@@ -1,0 +1,11 @@
+{
+  "Simulator Target Bundle": "com.castao.tailydose",
+  "aps": {
+    "alert": {
+      "title": "Mochi needs Calming Drops",
+      "body": "3 drops • Use before the evening wind-down."
+    },
+    "sound": "default",
+    "badge": 1
+  }
+}

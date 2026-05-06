@@ -650,13 +650,13 @@
         }
       }
     },
-    "Payment is charged to your Apple Account at confirmation. Subscription renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.": {
+    "Payment is charged to your Apple Account at confirmation. This is a one-time purchase that unlocks Pro features permanently for your account.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Payment is charged to your Apple Account at confirmation. Subscription renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings."
+            "value": "Payment is charged to your Apple Account at confirmation. This is a one-time purchase that unlocks Pro features permanently for your account."
           }
         }
       }
@@ -936,13 +936,13 @@
         }
       }
     },
-    "The annual plan includes a 7-day free trial when available.": {
+    "One purchase, no recurring subscription": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The annual plan includes a 7-day free trial when available."
+            "value": "One purchase, no recurring subscription"
           }
         }
       }

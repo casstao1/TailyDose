@@ -15,7 +15,7 @@ struct MedicationsView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         PlushCard {
                             VStack(alignment: .leading, spacing: 12) {
-                                SectionHeading(eyebrow: "Medication Desk", title: "Multiple pets, multiple meds")
+                                SectionHeading(eyebrow: "Medication Desk", title: "Multiple pets, multiple medications")
                                 Text("Every medication stores dosage, directions, start date, and one or more reminder times locally.")
                                     .font(.subheadline)
                                     .foregroundStyle(PetTheme.muted)
@@ -188,77 +188,82 @@ struct MedicationEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Medication") {
-                    TextField("Medication name", text: $name)
-                    TextField("Dosage", text: $dosage)
-                    VStack(alignment: .leading, spacing: 4) {
-                        TextField("Doses remaining", text: $remainingDosesText)
-                            .keyboardType(.numberPad)
-                            .onChange(of: remainingDosesText) { _, newValue in
-                                // Strip anything that isn't a digit so paste/autofill
-                                // can't slip letters past the number-pad keyboard.
-                                let filtered = newValue.filter(\.isNumber)
-                                if filtered != newValue {
-                                    remainingDosesText = filtered
+            ZStack {
+                PetBackgroundView()
+
+                Form {
+                    Section("Medication") {
+                        TextField("Medication name", text: $name)
+                        TextField("Dosage", text: $dosage)
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField("Doses remaining", text: $remainingDosesText)
+                                .keyboardType(.numberPad)
+                                .onChange(of: remainingDosesText) { _, newValue in
+                                    // Strip anything that isn't a digit so paste/autofill
+                                    // can't slip letters past the number-pad keyboard.
+                                    let filtered = newValue.filter(\.isNumber)
+                                    if filtered != newValue {
+                                        remainingDosesText = filtered
+                                    }
                                 }
+                            if let message = remainingDosesError {
+                                Text(message)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .accessibilityLabel("Doses remaining error: \(message)")
                             }
-                        if let message = remainingDosesError {
-                            Text(message)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                                .accessibilityLabel("Doses remaining error: \(message)")
                         }
-                    }
-                    TextField("Directions", text: $directions, axis: .vertical)
-                        .lineLimit(3...5)
-                    DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
-                    Toggle("Set course end date", isOn: $hasCourseEndDate)
-                    if hasCourseEndDate {
-                        DatePicker("Course End", selection: $courseEndDate, in: startDate..., displayedComponents: .date)
-                    }
-                }
-
-                Section("Reminders") {
-                    if subscriptionManager.hasActiveSubscription {
-                        Toggle("Enable push alerts", isOn: $reminderEnabled)
-                    } else {
-                        PlushCard(tint: PetTheme.petMint, compact: true) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Label("Push reminder alerts are part of TailyDose Pro", systemImage: "bell.badge.fill")
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(PetTheme.accentDeep)
-
-                                Text("Your medication times will still appear on the dashboard, but push alerts require Pro.")
-                                    .font(.footnote)
-                                    .foregroundStyle(PetTheme.ink.opacity(0.82))
-
-                                Button {
-                                    showingPaywall = true
-                                } label: {
-                                    Label("Unlock Push Alerts", systemImage: "bell.badge.fill")
-                                }
-                                .buttonStyle(PrimaryPillButtonStyle(compact: true))
-                            }
+                        TextField("Directions", text: $directions, axis: .vertical)
+                            .lineLimit(3...5)
+                        DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
+                        Toggle("Set course end date", isOn: $hasCourseEndDate)
+                        if hasCourseEndDate {
+                            DatePicker("Course End", selection: $courseEndDate, in: startDate..., displayedComponents: .date)
                         }
                     }
 
-                    ForEach(Array(reminderDates.enumerated()), id: \.element.id) { index, entry in
-                        ReminderTimeRow(
-                            title: "Time \(index + 1)",
-                            selection: $reminderDates[index].date,
-                            onDelete: {
-                                reminderDates.removeAll { $0.id == entry.id }
-                            }
-                        )
-                    }
+                    Section("Reminders") {
+                        if subscriptionManager.hasActiveSubscription {
+                            Toggle("Enable push alerts", isOn: $reminderEnabled)
+                        } else {
+                            PlushCard(tint: PetTheme.petMint, compact: true) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Label("Push reminder alerts are part of TailyDose Pro", systemImage: "bell.badge.fill")
+                                        .font(.headline.weight(.semibold))
+                                        .foregroundStyle(PetTheme.accentDeep)
 
-                    Button {
-                        reminderDates.append(IdentifiableDate(date: Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: .now) ?? .now))
-                    } label: {
-                        Label("Add Reminder Time", systemImage: "plus.circle.fill")
+                                    Text("Your medication times will still appear on the dashboard, but push alerts require Pro.")
+                                        .font(.footnote)
+                                        .foregroundStyle(PetTheme.ink.opacity(0.82))
+
+                                    Button {
+                                        showingPaywall = true
+                                    } label: {
+                                        Label("Unlock Push Alerts", systemImage: "bell.badge.fill")
+                                    }
+                                    .buttonStyle(PrimaryPillButtonStyle(compact: true))
+                                }
+                            }
+                        }
+
+                        ForEach(Array(reminderDates.enumerated()), id: \.element.id) { index, entry in
+                            ReminderTimeRow(
+                                title: "Time \(index + 1)",
+                                selection: $reminderDates[index].date,
+                                onDelete: {
+                                    reminderDates.removeAll { $0.id == entry.id }
+                                }
+                            )
+                        }
+
+                        Button {
+                            reminderDates.append(IdentifiableDate(date: Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: .now) ?? .now))
+                        } label: {
+                            Label("Add Reminder Time", systemImage: "plus.circle.fill")
+                        }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(medication == nil ? "New Medication" : "Edit Medication")
             .toolbar {
@@ -271,6 +276,7 @@ struct MedicationEditorView: View {
                 }
             }
         }
+        .preferredColorScheme(.light)
         .sheet(isPresented: $showingPaywall) {
             ProPaywallView(context: .reminders)
         }

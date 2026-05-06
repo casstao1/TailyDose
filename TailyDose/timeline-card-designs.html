@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TailyDose — Timeline Card Type Scales</title>
+<style>
+  :root {
+    --ink: rgb(43, 51, 71);
+    --muted: rgb(117, 133, 156);
+    --muted-soft: rgb(143, 158, 179);
+    --accent-deep: rgb(82, 140, 212);
+    --pet-pink: rgb(250, 222, 232);
+    --pet-pink-deep: rgb(237, 171, 194);
+    --cream: #ffffff;
+    --bg: linear-gradient(135deg, #fffcff 0%, #f6fafe 50%, #fffaf8 100%);
+    --card-shadow: 0 12px 28px rgba(158, 174, 199, 0.28);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 48px 24px 96px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .container { max-width: 780px; margin: 0 auto; }
+
+  h1 {
+    font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px;
+  }
+  .subtitle {
+    font-size: 14px; color: var(--muted); margin: 0 0 36px; line-height: 1.5;
+  }
+
+  .concept { margin-bottom: 44px; }
+  .concept-header {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;
+  }
+  .concept-label {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent-deep);
+  }
+  .concept-title {
+    font-size: 18px; font-weight: 700; color: var(--ink); margin: 0;
+  }
+  .concept-desc {
+    font-size: 13px; color: var(--muted);
+    margin: 0 0 14px; line-height: 1.55;
+  }
+  .scale-meta {
+    margin-top: 12px; padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    font-size: 12px; color: var(--muted); line-height: 1.6;
+    font-family: "SF Mono", ui-monospace, monospace;
+  }
+  .scale-meta strong { color: var(--ink); font-weight: 700; }
+
+  /* CARD BASE */
+  .card {
+    position: relative;
+    background: var(--cream);
+    border-radius: 22px;
+    box-shadow: var(--card-shadow);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    overflow: hidden;
+    padding: 14px 16px;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0;
+    background: var(--pet-pink);
+    opacity: 0.55; pointer-events: none;
+  }
+  .card > * { position: relative; z-index: 1; }
+
+  .row { display: flex; align-items: flex-start; gap: 12px; }
+
+  .left-col {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    flex-shrink: 0;
+  }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(237, 171, 194, 0.28);
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+  }
+  .avatar svg { fill: var(--pet-pink-deep); }
+
+  .content-col { flex: 1; display: flex; flex-direction: column; }
+
+  .check {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2.5px solid var(--accent-deep);
+    opacity: 0.85; flex-shrink: 0; margin-top: 8px;
+  }
+
+  .variants { display: flex; flex-direction: column; gap: 10px; }
+  .variant-label {
+    font-size: 11px; color: var(--muted); margin: 4px 0 -4px 4px;
+    letter-spacing: 0.04em;
+  }
+  .dog-svg { width: 22px; height: 22px; }
+
+  /* --- 1: Time hero, matched body --- */
+  .c1 .content-col { gap: 2px; }
+  .c1 .time { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+  .c1 .sub { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .c1 .directions { font-size: 15px; font-weight: 500; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+  .c1 .pet-name { font-size: 15px; font-weight: 600; color: var(--muted); }
+
+  /* --- 2: Balanced duo --- */
+  .c2 .content-col { gap: 2px; }
+  .c2 .time { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; }
+  .c2 .sub { font-size: 20px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+  .c2 .directions { font-size: 13px; color: var(--muted); line-height: 1.4; margin-top: 4px; }
+  .c2 .pet-name { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+  /* --- 3: Flat scale --- */
+  .c3 .content-col { gap: 2px; }
+  .c3 .time { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+  .c3 .sub { font-size: 17px; font-weight: 500; color: var(--ink); }
+  .c3 .directions { font-size: 17px; font-weight: 400; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+  .c3 .pet-name { font-size: 17px; font-weight: 500; color: var(--muted); }
+
+  /* --- 4: Time pill + med hero --- */
+  .c4 .content-col { gap: 6px; }
+  .c4 .time-pill {
+    align-self: flex-start;
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    background: rgba(237, 171, 194, 0.4);
+    border-radius: 999px;
+    font-size: 12px; font-weight: 700;
+    color: rgb(155, 78, 110);
+    letter-spacing: 0.02em;
+  }
+  .c4 .sub { font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; line-height: 1.1; }
+  .c4 .directions { font-size: 13px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+  .c4 .pet-name { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* --- 5: Med lead (inverted) --- */
+  .c5 .content-col { gap: 2px; }
+  .c5 .sub { font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -0.02em; line-height: 1.1; }
+  .c5 .time { font-size: 13px; font-weight: 700; color: var(--accent-deep); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 2px; }
+  .c5 .directions { font-size: 13px; color: var(--muted); line-height: 1.4; margin-top: 4px; }
+  .c5 .pet-name { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+  /* --- 6: One-line inline hero --- */
+  .c6 .content-col { gap: 4px; }
+  .c6 .hero-row {
+    display: flex; align-items: baseline; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .c6 .time { font-size: 18px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+  .c6 .sep {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--muted-soft);
+    align-self: center;
+    flex-shrink: 0;
+  }
+  .c6 .sub { font-size: 18px; font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
+  .c6 .directions { font-size: 13px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+  .c6 .pet-name { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+  /* --- 7: Ultra compact single block --- */
+  .c7 { padding: 12px 14px; }
+  .c7 .row { align-items: center; }
+  .c7 .avatar { width: 36px; height: 36px; }
+  .c7 .avatar .dog-svg { width: 18px; height: 18px; }
+  .c7 .content-col { gap: 1px; }
+  .c7 .hero-row { display: flex; align-items: baseline; gap: 8px; }
+  .c7 .time { font-size: 15px; font-weight: 800; color: var(--ink); }
+  .c7 .sub { font-size: 15px; font-weight: 500; color: var(--ink); }
+  .c7 .pet-name { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .c7 .directions { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+  .c7 .left-col { gap: 0; }
+  .c7 .check { width: 24px; height: 24px; border-width: 2px; margin-top: 4px; }
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Timeline Card — 7 Type-Scale Options</h1>
+  <p class="subtitle">Seven directions for collapsing the current 3-size hierarchy. Each uses a constrained scale with weight + color carrying most of the hierarchy. Every option shows the card with and without a description so you can see how it flexes.</p>
+
+  <!-- ================= OPTION 1 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 1</span>
+      <h2 class="concept-title">Time hero, everything else matched</h2>
+    </div>
+    <p class="concept-desc">Time stays the visual anchor (26pt). Everything else — pet name, med name, description — at one unified size (15pt). Hierarchy comes from weight and color only.</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c1">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c1">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+            <div class="directions">Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 26 / 15 &middot; <strong>Weights:</strong> 800, 600, 500 &middot; <strong>Colors:</strong> ink, muted</div>
+  </div>
+
+  <!-- ================= OPTION 2 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 2</span>
+      <h2 class="concept-title">Balanced duo — time and med same size</h2>
+    </div>
+    <p class="concept-desc">Time and med name equal billing at 20pt, time bolder. Pet name and description drop to 13pt muted. Closest to iOS Reminders / Health dose cards.</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c2">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c2">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+            <div class="directions">Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 20 / 13 &middot; <strong>Weights:</strong> 800, 600, 400 &middot; <strong>Colors:</strong> ink, muted</div>
+  </div>
+
+  <!-- ================= OPTION 3 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 3</span>
+      <h2 class="concept-title">Flat scale — one size, weight carries hierarchy</h2>
+    </div>
+    <p class="concept-desc">Everything at 17pt. Hierarchy is pure weight + color. Maximally restrained; feels like a system list row. Uniform density on every card.</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c3">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c3">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+            <div class="directions">Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 17 everywhere &middot; <strong>Weights:</strong> 800, 500, 400 &middot; <strong>Colors:</strong> ink, muted</div>
+  </div>
+
+  <!-- ================= OPTION 4 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 4</span>
+      <h2 class="concept-title">Time as pill, medication as hero</h2>
+    </div>
+    <p class="concept-desc">Shrink the time into a small rose-tinted pill at the top, then let the medication name ("3 Add") become the visual anchor at 22pt. Pet name is a tiny uppercase eyebrow. Time reads as metadata, the med is the headline — good if the user already knows roughly when doses happen and needs to confirm <em>which</em> med.</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c4">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">ASSAD</div>
+          </div>
+          <div class="content-col">
+            <div class="time-pill">8:00 AM</div>
+            <div class="sub">3 Add</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c4">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">ASSAD</div>
+          </div>
+          <div class="content-col">
+            <div class="time-pill">8:00 AM</div>
+            <div class="sub">3 Add</div>
+            <div class="directions">Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 22 / 13 / 12 pill &middot; <strong>Weights:</strong> 800, 700 pill, 700 eyebrow &middot; <strong>Colors:</strong> ink, muted, rose</div>
+  </div>
+
+  <!-- ================= OPTION 5 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 5</span>
+      <h2 class="concept-title">Medication lead — time becomes an eyebrow</h2>
+    </div>
+    <p class="concept-desc">Inverts the current hierarchy. Med name ("3 Add") becomes the 22pt hero. Time sits above it as a small uppercase eyebrow in the accent blue — like a section label. Good if you think the primary question is "what am I giving?" rather than "when is the next dose?"</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c5">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c5">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="time">8:00 AM</div>
+            <div class="sub">3 Add</div>
+            <div class="directions">Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 22 / 13 &middot; <strong>Weights:</strong> 800, 700 eyebrow, 400–600 support &middot; <strong>Colors:</strong> ink, accent-blue eyebrow, muted</div>
+  </div>
+
+  <!-- ================= OPTION 6 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 6</span>
+      <h2 class="concept-title">Inline one-line hero — time and med on one row</h2>
+    </div>
+    <p class="concept-desc">Time and med sit on the <em>same</em> line separated by a dot ("8:00 AM · 3 Add"), at 18pt. Pet name + description stack under it at 13pt. Collapses vertical space so cards are shorter; best if descriptions are usually short and med names aren't long.</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c6">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="hero-row">
+              <span class="time">8:00 AM</span>
+              <span class="sep"></span>
+              <span class="sub">3 Add</span>
+            </div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c6">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="content-col">
+            <div class="hero-row">
+              <span class="time">8:00 AM</span>
+              <span class="sep"></span>
+              <span class="sub">3 Add</span>
+            </div>
+            <div class="directions">Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 18 / 13 &middot; <strong>Weights:</strong> 800, 500, 400–600 &middot; <strong>Colors:</strong> ink, muted</div>
+  </div>
+
+  <!-- ================= OPTION 7 ================= -->
+  <div class="concept">
+    <div class="concept-header">
+      <span class="concept-label">Option 7</span>
+      <h2 class="concept-title">Ultra compact — maximum list density</h2>
+    </div>
+    <p class="concept-desc">Smaller card, smaller avatar (36pt), time and med at 15pt on one row, pet name + directions at 12pt. Best if users often have 6+ doses a day across multiple pets. Roughly 30% shorter than the current card, so more entries fit on screen without scrolling.</p>
+    <div class="variants">
+      <div class="variant-label">No description</div>
+      <div class="card c7">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+          </div>
+          <div class="content-col">
+            <div class="hero-row">
+              <span class="time">8:00 AM</span>
+              <span class="sub">3 Add</span>
+            </div>
+            <div class="pet-name">Assad</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+      <div class="variant-label">With description</div>
+      <div class="card c7">
+        <div class="row">
+          <div class="left-col">
+            <div class="avatar"><svg class="dog-svg" viewBox="0 0 24 24"><path d="M4.5 10.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm2.25-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm10.5 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm2.25 4.5c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM12 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-2.33 0-7 1.17-7 3.5V18h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+          </div>
+          <div class="content-col">
+            <div class="hero-row">
+              <span class="time">8:00 AM</span>
+              <span class="sub">3 Add</span>
+            </div>
+            <div class="pet-name">Assad &middot; Give with breakfast, wait 10 min before walk</div>
+          </div>
+          <div class="check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scale-meta"><strong>Scale:</strong> 15 / 12 &middot; <strong>Weights:</strong> 800, 500, 600 &middot; <strong>Colors:</strong> ink, muted</div>
+  </div>
+
+</div>
+</body>
+</html>

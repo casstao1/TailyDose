@@ -6,19 +6,17 @@ TailyDose provides pet medication tracking, reminder scheduling, dose logging, a
 
 ## Subscription Terms
 
-TailyDose Pro is offered as an auto-renewable subscription:
+TailyDose Pro is offered as a one-time purchase:
 
-- Monthly: $3.99 per month
-- Annual: $29.99 per year, with a 7-day free trial when available in App Store Connect
+- Lifetime unlock: $9.99 one time
 
 Pricing may vary by territory and is shown in the App Store before purchase.
 
 ## Billing
 
 - Payment is charged to your Apple Account at confirmation of purchase.
-- Subscriptions renew automatically unless canceled at least 24 hours before the end of the current billing period.
-- Your account is charged for renewal within 24 hours before the end of the current period.
-- You can manage or cancel your subscription in your App Store account settings after purchase.
+- Payment is charged to your Apple Account at confirmation of purchase.
+- You can restore prior purchases using Apple's restore flow.
 
 ## Free Features and Pro Features
 

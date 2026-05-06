@@ -21,7 +21,7 @@ enum PremiumGateContext {
     var message: String {
         switch self {
         case .multiPet:
-            "TailyDose Pro lets you manage more than one pet from the same account."
+            "TailyDose Pro unlocks full multi-pet care management with a single lifetime purchase."
         case .reminders:
             "TailyDose Pro unlocks push medication alerts while keeping basic reminder scheduling free."
         case .export:
@@ -34,12 +34,8 @@ enum PremiumGateContext {
 final class SubscriptionManager: ObservableObject {
     static let shared = SubscriptionManager()
 
-    static let monthlyProductID = "com.castao.tailydose.pro.monthly"
-    static let yearlyProductID = "com.castao.tailydose.pro.yearly"
-
-    static let monthlyDisplayPrice = "$3.99/month"
-    static let yearlyDisplayPrice = "$29.99/year"
-    static let yearlyTrialLabel = "7-day free trial"
+    static let lifetimeProductID = "com.castao.tailydose.pro.lifetime"
+    static let lifetimeFallbackDisplayPrice = "$9.99 one-time"
 
     @Published private(set) var products: [Product] = []
     @Published private(set) var hasActiveSubscription = false
@@ -71,12 +67,15 @@ final class SubscriptionManager: ObservableObject {
         transactionUpdatesTask?.cancel()
     }
 
-    var monthlyProduct: Product? {
-        products.first { $0.id == Self.monthlyProductID }
+    var lifetimeProduct: Product? {
+        products.first { $0.id == Self.lifetimeProductID }
     }
 
-    var yearlyProduct: Product? {
-        products.first { $0.id == Self.yearlyProductID }
+    var lifetimeDisplayPrice: String {
+        if let lifetimeProduct {
+            return "\(lifetimeProduct.displayPrice) one-time"
+        }
+        return Self.lifetimeFallbackDisplayPrice
     }
 
     func refreshProducts() async {
@@ -91,12 +90,9 @@ final class SubscriptionManager: ObservableObject {
         defer { isLoadingProducts = false }
 
         do {
-            let storeProducts = try await Product.products(for: [Self.monthlyProductID, Self.yearlyProductID])
-            products = storeProducts.sorted { lhs, rhs in
-                order(for: lhs.id) < order(for: rhs.id)
-            }
+            products = try await Product.products(for: [Self.lifetimeProductID])
         } catch {
-            purchaseErrorMessage = "Unable to load subscription options right now."
+            purchaseErrorMessage = "Unable to load purchase options right now."
         }
     }
 
@@ -109,23 +105,20 @@ final class SubscriptionManager: ObservableObject {
         }
         #endif
 
-        var isSubscribed = false
+        var hasUnlock = false
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
-            guard [Self.monthlyProductID, Self.yearlyProductID].contains(transaction.productID) else { continue }
-
-            if transaction.revocationDate == nil,
-               (transaction.expirationDate == nil || (transaction.expirationDate ?? .distantFuture) > .now) {
-                isSubscribed = true
-                break
-            }
+            guard transaction.productID == Self.lifetimeProductID else { continue }
+            guard transaction.revocationDate == nil else { continue }
+            hasUnlock = true
+            break
         }
 
-        hasActiveSubscription = isSubscribed
+        hasActiveSubscription = hasUnlock
     }
 
-    func purchaseYearly() async -> Bool {
+    func purchaseLifetime() async -> Bool {
         #if DEBUG
         if debugForceProUnlocked {
             hasActiveSubscription = true
@@ -133,18 +126,7 @@ final class SubscriptionManager: ObservableObject {
             return true
         }
         #endif
-        return await purchase(productID: Self.yearlyProductID)
-    }
-
-    func purchaseMonthly() async -> Bool {
-        #if DEBUG
-        if debugForceProUnlocked {
-            hasActiveSubscription = true
-            purchaseErrorMessage = nil
-            return true
-        }
-        #endif
-        return await purchase(productID: Self.monthlyProductID)
+        return await purchase(productID: Self.lifetimeProductID)
     }
 
     func restorePurchases() async {
@@ -178,7 +160,7 @@ final class SubscriptionManager: ObservableObject {
         }
 
         guard let product = products.first(where: { $0.id == productID }) else {
-            purchaseErrorMessage = "Subscription option unavailable. Check App Store Connect product setup."
+            purchaseErrorMessage = "Purchase option unavailable. Check App Store Connect product setup."
             return false
         }
 
@@ -228,14 +210,6 @@ final class SubscriptionManager: ObservableObject {
             }
         }
     }
-
-    private func order(for productID: String) -> Int {
-        switch productID {
-        case Self.yearlyProductID: 0
-        case Self.monthlyProductID: 1
-        default: 99
-        }
-    }
 }
 
 struct ProPaywallView: View {
@@ -243,12 +217,6 @@ struct ProPaywallView: View {
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
 
     let context: PremiumGateContext
-    @State private var selectedPlan: Plan = .yearly
-
-    private enum Plan {
-        case yearly
-        case monthly
-    }
 
     var body: some View {
         NavigationStack {
@@ -269,51 +237,33 @@ struct ProPaywallView: View {
                                     benefitRow("Push medication alerts")
                                     benefitRow("Multiple pets in one account")
                                     benefitRow("Vet-ready share and export")
+                                    benefitRow("One purchase, no recurring subscription")
                                 }
                             }
                         }
 
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Choose a plan")
+                            Text("Unlock once")
                                 .font(.headline)
                                 .foregroundStyle(PetTheme.ink)
 
-                            planCard(
-                                title: "Annual",
-                                subtitle: SubscriptionManager.yearlyDisplayPrice,
-                                badge: SubscriptionManager.yearlyTrialLabel,
-                                isSelected: selectedPlan == .yearly
-                            ) {
-                                selectedPlan = .yearly
-                            }
-
-                            planCard(
-                                title: "Monthly",
-                                subtitle: SubscriptionManager.monthlyDisplayPrice,
-                                badge: nil,
-                                isSelected: selectedPlan == .monthly
-                            ) {
-                                selectedPlan = .monthly
-                            }
+                            unlockCard(
+                                title: "Lifetime Unlock",
+                                subtitle: subscriptionManager.lifetimeDisplayPrice
+                            )
                         }
 
                         PlushCard(compact: true) {
                             VStack(alignment: .leading, spacing: 10) {
                                 Button {
                                     Task {
-                                        let succeeded = switch selectedPlan {
-                                        case .yearly:
-                                            await subscriptionManager.purchaseYearly()
-                                        case .monthly:
-                                            await subscriptionManager.purchaseMonthly()
-                                        }
-
+                                        let succeeded = await subscriptionManager.purchaseLifetime()
                                         if succeeded {
                                             dismiss()
                                         }
                                     }
                                 } label: {
-                                    Label(primaryCTA, systemImage: "sparkles")
+                                    Label("Unlock TailyDose Pro", systemImage: "sparkles")
                                 }
                                 .buttonStyle(PrimaryPillButtonStyle())
                                 .disabled(subscriptionManager.isPurchasing)
@@ -329,22 +279,18 @@ struct ProPaywallView: View {
                                 .buttonStyle(SecondaryPillButtonStyle())
                                 .disabled(subscriptionManager.isPurchasing)
 
-                                Text("Payment is charged to your Apple Account at confirmation. Subscription renews automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.")
-                                    .font(.caption)
-                                    .foregroundStyle(PetTheme.muted)
-
-                                Text("The annual plan includes a 7-day free trial when available.")
+                                Text("Payment is charged to your Apple Account at confirmation. This is a one-time purchase that unlocks Pro features permanently for your account.")
                                     .font(.caption)
                                     .foregroundStyle(PetTheme.muted)
 
                                 HStack(spacing: 16) {
                                     Link("Privacy Policy", destination: AppStoreLinks.privacyPolicy)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(PetTheme.accentDeep)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(PetTheme.accentDeep)
 
                                     Link("Terms of Use", destination: AppStoreLinks.termsOfUse)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(PetTheme.accentDeep)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(PetTheme.accentDeep)
                                 }
                             }
                         }
@@ -373,15 +319,6 @@ struct ProPaywallView: View {
         }
     }
 
-    private var primaryCTA: String {
-        switch selectedPlan {
-        case .yearly:
-            "Start 7-Day Free Trial"
-        case .monthly:
-            "Subscribe Monthly"
-        }
-    }
-
     private var purchaseErrorBinding: Binding<Bool> {
         Binding(
             get: { subscriptionManager.purchaseErrorMessage != nil },
@@ -401,50 +338,26 @@ struct ProPaywallView: View {
     }
 
     @ViewBuilder
-    private func planCard(
-        title: String,
-        subtitle: String,
-        badge: String?,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            PlushCard(compact: true) {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Text(title)
-                                .font(.headline)
-                                .foregroundStyle(PetTheme.ink)
+    private func unlockCard(title: String, subtitle: String) -> some View {
+        PlushCard(compact: true) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(PetTheme.ink)
 
-                            if let badge {
-                                Text(badge)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(PetTheme.accentDeep)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(PetTheme.petMint.opacity(0.8), in: Capsule())
-                            }
-                        }
-
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(PetTheme.muted)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.title3)
-                        .foregroundStyle(isSelected ? PetTheme.accentDeep : PetTheme.muted.opacity(0.7))
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(PetTheme.muted)
                 }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(isSelected ? PetTheme.accentDeep.opacity(0.5) : .clear, lineWidth: 2)
+
+                Spacer()
+
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.title3)
+                    .foregroundStyle(PetTheme.accentDeep)
             }
         }
-        .buttonStyle(.plain)
     }
 }
 

@@ -49,7 +49,7 @@ struct HomeView: View {
 
                             HStack(spacing: 12) {
                                 TinyMetric(value: "\(pets.count)", label: "Pets", systemImage: "pawprint.fill")
-                                TinyMetric(value: "\(activeMeds.count)", label: "Active Meds", systemImage: "pills.fill")
+                                TinyMetric(value: "\(activeMeds.count)", label: "Active Medications", systemImage: "pills.fill")
                             }
                         }
                     }
@@ -178,16 +178,15 @@ struct HomeView: View {
         .sheet(isPresented: $showingPaywall) {
             ProPaywallView(context: paywallContext)
         }
-        .confirmationDialog(
+        .alert(
             pendingPetDeletion.map { "Delete \($0.name)?" } ?? "Delete pet?",
             isPresented: Binding(
                 get: { pendingPetDeletion != nil },
                 set: { if !$0 { pendingPetDeletion = nil } }
             ),
-            titleVisibility: .visible,
             presenting: pendingPetDeletion
         ) { pet in
-            Button("Delete \(pet.name) and all records", role: .destructive) {
+            Button("Delete Pet and All Records", role: .destructive) {
                 modelContext.delete(pet)
                 try? modelContext.save()
                 pendingPetDeletion = nil
@@ -228,14 +227,17 @@ struct HomeView: View {
 }
 
 struct PetDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var showingMedicationEditor = false
     @State private var editingMedication: MedicationSchedule?
     @State private var showingPetEditor = false
     @State private var showingRecordEditor = false
     @State private var editingRecord: VetRecord?
+    @State private var detailRecord: VetRecord?
     @State private var pendingMedicationDeletion: MedicationSchedule?
     @State private var pendingRecordDeletion: VetRecord?
+    @State private var pendingPetDeletion = false
 
     let pet: PetProfile
 
@@ -276,12 +278,12 @@ struct PetDetailView: View {
                 }
 
                 HStack {
-                    SectionHeading(eyebrow: "Meds", title: "Schedules")
+                    SectionHeading(eyebrow: "Medications", title: "Medication schedules")
                     Spacer()
                     Button {
                         showingMedicationEditor = true
                     } label: {
-                        Label("Add Med", systemImage: "plus.circle.fill")
+                        Label("Add Medication", systemImage: "plus.circle.fill")
                             .font(.subheadline.bold())
                     }
                 }
@@ -313,7 +315,7 @@ struct PetDetailView: View {
                                         Button("Edit", systemImage: "pencil") {
                                             editingMedication = medication
                                         }
-                                        Button("Delete", systemImage: "trash", role: .destructive) {
+                                        Button("Delete Medication", systemImage: "trash", role: .destructive) {
                                             pendingMedicationDeletion = medication
                                         }
                                     } label: {
@@ -352,7 +354,7 @@ struct PetDetailView: View {
                 }
 
                 HStack {
-                    SectionHeading(eyebrow: "Vault", title: "Vet records")
+                    SectionHeading(eyebrow: "Records", title: "Pet records")
                     Spacer()
                     Button {
                         showingRecordEditor = true
@@ -389,18 +391,29 @@ struct PetDetailView: View {
                                         }
                                 }
 
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(alignment: .top, spacing: 12) {
                                         Text(record.title)
                                             .font(.headline)
                                             .foregroundStyle(PetTheme.ink)
                                         Spacer()
-                                        Text(record.recordDate.formatted(date: .abbreviated, time: .omitted))
-                                            .font(.caption)
-                                            .foregroundStyle(PetTheme.muted)
+                                        Menu {
+                                            Button("Edit Record", systemImage: "pencil") {
+                                                editingRecord = record
+                                            }
+                                            Button("Delete Record", systemImage: "trash", role: .destructive) {
+                                                pendingRecordDeletion = record
+                                            }
+                                        } label: {
+                                            Image(systemName: "ellipsis.circle.fill")
+                                                .font(.title3)
+                                                .foregroundStyle(PetTheme.accentDeep)
+                                        }
+                                        .accessibilityLabel("Actions for \(record.title)")
+                                        .accessibilityHint("Edit or delete this record")
                                     }
 
-                                    Text(record.category)
+                                    Text(record.recordDate.formatted(date: .abbreviated, time: .omitted))
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(PetTheme.accentDeep)
 
@@ -408,17 +421,18 @@ struct PetDetailView: View {
                                         Text(record.summary)
                                             .font(.footnote)
                                             .foregroundStyle(PetTheme.muted)
+                                            .lineLimit(2)
+                                    } else {
+                                        Text("Tap to view details.")
+                                            .font(.footnote)
+                                            .foregroundStyle(PetTheme.muted)
                                     }
                                 }
                             }
                         }
-                        .contextMenu {
-                            Button("Edit Record", systemImage: "pencil") {
-                                editingRecord = record
-                            }
-                            Button("Delete Record", systemImage: "trash", role: .destructive) {
-                                pendingRecordDeletion = record
-                            }
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .onTapGesture {
+                            detailRecord = record
                         }
                     }
                 }
@@ -428,8 +442,15 @@ struct PetDetailView: View {
         .background(PetBackgroundView())
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Edit") {
-                    showingPetEditor = true
+                Menu {
+                    Button("Edit Pet", systemImage: "pencil") {
+                        showingPetEditor = true
+                    }
+                    Button("Delete Pet", systemImage: "trash", role: .destructive) {
+                        pendingPetDeletion = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -448,16 +469,33 @@ struct PetDetailView: View {
         .sheet(item: $editingRecord) { record in
             VetRecordEditorView(pet: pet, record: record)
         }
-        .confirmationDialog(
+        .sheet(item: $detailRecord) { record in
+            NavigationStack {
+                VetRecordDetailView(pet: pet, record: record)
+            }
+        }
+        .alert(
+            "Delete \(pet.name)?",
+            isPresented: $pendingPetDeletion
+        ) {
+            Button("Delete Pet and All Records", role: .destructive) {
+                modelContext.delete(pet)
+                try? modelContext.save()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes \(pet.name)'s medications, logs, and records permanently.")
+        }
+        .alert(
             pendingMedicationDeletion.map { "Delete \($0.name)?" } ?? "Delete medication?",
             isPresented: Binding(
                 get: { pendingMedicationDeletion != nil },
                 set: { if !$0 { pendingMedicationDeletion = nil } }
             ),
-            titleVisibility: .visible,
             presenting: pendingMedicationDeletion
         ) { medication in
-            Button("Delete \(medication.name) and its history", role: .destructive) {
+            Button("Delete Medication", role: .destructive) {
                 modelContext.delete(medication)
                 try? modelContext.save()
                 pendingMedicationDeletion = nil
@@ -468,16 +506,15 @@ struct PetDetailView: View {
         } message: { _ in
             Text("This removes the schedule and all its dose logs permanently.")
         }
-        .confirmationDialog(
-            "Delete record?",
+        .alert(
+            pendingRecordDeletion.map { "Delete \($0.title)?" } ?? "Delete record?",
             isPresented: Binding(
                 get: { pendingRecordDeletion != nil },
                 set: { if !$0 { pendingRecordDeletion = nil } }
             ),
-            titleVisibility: .visible,
             presenting: pendingRecordDeletion
         ) { record in
-            Button("Delete \(record.title)", role: .destructive) {
+            Button("Delete Record", role: .destructive) {
                 modelContext.delete(record)
                 try? modelContext.save()
                 pendingRecordDeletion = nil
@@ -659,6 +696,7 @@ struct PetEditorView: View {
                 }
             }
         }
+        .preferredColorScheme(.light)
         .sheet(isPresented: $showingPaywall) {
             ProPaywallView(context: .multiPet)
         }
@@ -738,7 +776,6 @@ struct VetRecordEditorView: View {
     let record: VetRecord?
 
     @State private var title: String
-    @State private var category: String
     @State private var summary: String
     @State private var recordDate: Date
     @State private var selectedPhoto: PhotosPickerItem?
@@ -748,7 +785,6 @@ struct VetRecordEditorView: View {
         self.pet = pet
         self.record = record
         _title = State(initialValue: record?.title ?? "")
-        _category = State(initialValue: record?.category ?? "Visit Summary")
         _summary = State(initialValue: record?.summary ?? "")
         _recordDate = State(initialValue: record?.recordDate ?? .now)
         _imageData = State(initialValue: record?.imageData)
@@ -756,32 +792,36 @@ struct VetRecordEditorView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Record") {
-                    TextField("Title", text: $title)
-                    TextField("Category", text: $category)
-                    DatePicker("Record Date", selection: $recordDate, displayedComponents: .date)
-                    TextField("Summary", text: $summary, axis: .vertical)
-                        .lineLimit(3...6)
-                }
+            ZStack {
+                PetBackgroundView()
 
-                Section("Image") {
-                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        Label("Choose Image", systemImage: "photo")
+                Form {
+                    Section("Record") {
+                        TextField("Title", text: $title)
+                        DatePicker("Record Date", selection: $recordDate, displayedComponents: .date)
+                        TextField("Summary", text: $summary, axis: .vertical)
+                            .lineLimit(3...6)
                     }
 
-                    if let imageData, let uiImage = UIImage(data: imageData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 180)
+                    Section("Image") {
+                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                            Label("Choose Image", systemImage: "photo")
+                        }
 
-                        Button("Remove Image", role: .destructive) {
-                            self.imageData = nil
-                            selectedPhoto = nil
+                        if let imageData, let uiImage = UIImage(data: imageData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 180)
+
+                            Button("Remove Image", role: .destructive) {
+                                self.imageData = nil
+                                selectedPhoto = nil
+                            }
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(record == nil ? "New Record" : "Edit Record")
             .toolbar {
@@ -798,12 +838,14 @@ struct VetRecordEditorView: View {
                 imageData = try? await selectedPhoto.loadTransferable(type: Data.self)
             }
         }
+        .preferredColorScheme(.light)
     }
 
     private func save() {
-        let target = record ?? VetRecord(title: title, category: category)
+        let preservedCategory = record?.category ?? "Record"
+        let target = record ?? VetRecord(title: title, category: preservedCategory)
         target.title = title
-        target.category = category
+        target.category = preservedCategory
         target.summary = summary
         target.recordDate = recordDate
         target.imageData = imageData
@@ -816,6 +858,99 @@ struct VetRecordEditorView: View {
 
         try? modelContext.save()
         dismiss()
+    }
+}
+
+struct VetRecordDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    let pet: PetProfile
+    let record: VetRecord
+
+    @State private var showingEditor = false
+    @State private var showingDeleteConfirmation = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let imageData = record.imageData, let uiImage = UIImage(data: imageData) {
+                    PlushCard(compact: true) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: 280)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+
+                PlushCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionHeading(eyebrow: "Record", title: record.title)
+
+                        Label(pet.name, systemImage: pet.kind.symbol)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PetTheme.accentDeep)
+
+                        Text(record.recordDate.formatted(date: .complete, time: .omitted))
+                            .font(.subheadline)
+                            .foregroundStyle(PetTheme.muted)
+
+                        if record.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text("No details added yet.")
+                                .font(.body)
+                                .foregroundStyle(PetTheme.muted)
+                        } else {
+                            Text(record.summary)
+                                .font(.body)
+                                .foregroundStyle(PetTheme.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+
+                Button {
+                    showingEditor = true
+                } label: {
+                    Label("Edit Record", systemImage: "pencil")
+                }
+                .buttonStyle(PrimaryPillButtonStyle())
+            }
+            .padding(20)
+        }
+        .background(PetBackgroundView())
+        .navigationTitle("Record Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Edit") {
+                    showingEditor = true
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditor) {
+            VetRecordEditorView(pet: pet, record: record)
+        }
+        .alert(
+            "Delete \(record.title)?",
+            isPresented: $showingDeleteConfirmation
+        ) {
+            Button("Delete Record", role: .destructive) {
+                modelContext.delete(record)
+                try? modelContext.save()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This record will be removed permanently.")
+        }
     }
 }
 

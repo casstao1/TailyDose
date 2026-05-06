@@ -411,7 +411,7 @@ enum SampleDataSeeder {
             weight: "24 lb",
             vetName: "Harbor Animal Care",
             vetContact: "(555) 909-1134",
-            notes: "Very food motivated. Give meds after a short walk.",
+            notes: "Very food motivated. Give medication after a short walk.",
             moodStyle: .sky
         )
 
@@ -422,7 +422,7 @@ enum SampleDataSeeder {
             weight: "5 lb",
             vetName: "Willow Exotics",
             vetContact: "(555) 443-2288",
-            notes: "Prefers meds with banana mash.",
+            notes: "Prefers medication with banana mash.",
             moodStyle: .blush
         )
 
@@ -860,30 +860,6 @@ enum SampleDataSeeder {
         )
         log1.medication = olivePain
 
-        let log2 = DoseLog(
-            scheduledAt: oliveDentalMorning,
-            loggedAt: calendarDate(daysOffset: 0, hour: 7, minute: 52),
-            status: .taken,
-            note: "Handled well after breakfast."
-        )
-        log2.medication = oliveDental
-
-        let log3 = DoseLog(
-            scheduledAt: mochiMorning,
-            loggedAt: calendarDate(daysOffset: 0, hour: 8, minute: 11),
-            status: .taken,
-            note: "Ate it with salmon puree."
-        )
-        log3.medication = mochiProbiotic
-
-        let log4 = DoseLog(
-            scheduledAt: juniperMorning,
-            loggedAt: calendarDate(daysOffset: 0, hour: 9, minute: 6),
-            status: .taken,
-            note: "Much easier with banana mash."
-        )
-        log4.medication = juniperPain
-
         let log5 = DoseLog(
             scheduledAt: juniperBedtime,
             loggedAt: juniperBedtime,
@@ -893,9 +869,6 @@ enum SampleDataSeeder {
         log5.medication = juniperPain
 
         olivePain.logs.append(log1)
-        oliveDental.logs.append(log2)
-        mochiProbiotic.logs.append(log3)
-        juniperPain.logs.append(log4)
         juniperPain.logs.append(log5)
 
         olive.medications.append(olivePain)
